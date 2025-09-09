@@ -339,4 +339,15 @@ bugreport:
 merge_develop:
 	git fetch --all && git merge remotes/origin/develop
 
+.PHONY: run_local
+
+#
+# Local run using project temp_config and venv
+# - Stores data under ./temp/
+# - Uses project-local config in ./temp_config/
+#
+run_local: $(PROJECT_BASE)/.venv
+	$(PROJECT_BASE)/.venv/bin/pip install --upgrade -r requirements.txt
+	PYTHONPATH=$(PROJECT_BASE) $(PROJECT_BASE)/.venv/bin/python scripts/garmindb_cli.py -f temp_config --all --download --import --analyze --latest
+
 .PHONY: all setup install install_all uninstall uninstall_all update deps create_dbs rebuild_dbs update_dbs clean clean_dbs test zip_packages release clean test test_clean daily flake8 $(SUBMODULES:%=%-flake8) merge_develop

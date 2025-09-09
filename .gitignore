@@ -92,6 +92,10 @@ bugreport.txt
 *.html
 .*.conf
 GarminConnectConfig.json
+GarminConnectConfig.local.json
+temp_config/GarminConnectConfig.json
+temp_config/garth_session
+temp/
 *stats.txt
 *.png
 test/test_files
