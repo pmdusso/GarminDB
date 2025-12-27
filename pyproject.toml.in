@@ -1,0 +1,36 @@
+[project]
+name = "GarminDb"
+dynamic = ["version"]
+description = "Garmin Connect download and analysis"
+authors = [
+    {name = "Tom Goetz"},
+]
+requires-python = ">=3.10"
+readme = "README.md"
+license = {text = "GPL"}
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: OS Independent",
+]
+keywords = ["garmin", "garmin connect"]
+
+[project.urls]
+"Homepage" = "https://github.com/tcgoetz/GarminDB"
+"Repository" = "https://github.com/tcgoetz/GarminDB"
+"Issues" = "https://github.com/tcgoetz/GarminDB/issues"
+"Changelog" = "https://github.com/tcgoetz/GarminDB/releases"
+
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"

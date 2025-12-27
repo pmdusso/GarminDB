@@ -3,6 +3,7 @@
 #
 
 PROJECT_BASE ?= $(CURDIR)/../.
+export VENV=$(PROJECT_BASE)/.venv
 
 include $(PROJECT_BASE)/defines.mk
 
@@ -12,7 +13,7 @@ DB_OBJECTS_TEST_GROUPS=garmin_db_objects
 FILE_PARSE_TEST_GROUPS=fit_file tcx_loop tcx_file profile_file
 ALL_TEST_GROUPS=$(DB_TEST_GROUPS) $(DB_OBJECTS_TEST_GROUPS) $(FILE_PARSE_TEST_GROUPS)
 MANUAL_TEST_GROUPS=copy
-BASE_TESTGROUP=config
+BASE_TESTGROUP=config module_versions
 TEST_GROUPS=$(DB_TEST_GROUPS) $(DB_OBJECTS_TEST_GROUPS) $(FILE_PARSE_TEST_GROUPS) $(MANUAL_TEST_GROUPS) $(BASE_TESTGROUP)
 
 #
@@ -28,9 +29,10 @@ file_parse: $(FILE_PARSE_TEST_GROUPS)
 
 db_objects: $(DB_OBJECTS_TEST_GROUPS)
 
-verify_commit: db_objects
+verify_commit: module_versions db_objects
 
 clean:
+	echo "Cleaning test"
 	rm -f *.pyc
 	rm -f *.log
 	rm -f *.txt
@@ -40,9 +42,9 @@ clean:
 # Targets for testing smaller slices of functionality.
 #
 $(TEST_GROUPS):
-	$(PYTHON) test_$@.py
+	$(PYTHON_PATH) test_$@.py
 
 test_%:
-	$(PYTHON) -m unittest -v $@
+	$(PYTHON_PATH) -m unittest -v $@
 
 .PHONY: all db file_parse db_objects clean
