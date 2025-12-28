@@ -12,6 +12,7 @@ from .models import (
     HealthReport,
 )
 from .sleep_analyzer import SleepAnalyzer
+from .health_analyzer import HealthAnalyzer
 
 __all__ = [
     "TrendDirection",
@@ -24,4 +25,5 @@ __all__ = [
     "ActivityAnalysisResult",
     "HealthReport",
     "SleepAnalyzer",
+    "HealthAnalyzer",
 ]
