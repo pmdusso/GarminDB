@@ -5,4 +5,13 @@
 # package loaded.
 from .base import HealthRepository
 
-__all__ = ["HealthRepository"]
+# SQLiteHealthRepository has dependencies on other garmindb modules, so we
+# import it lazily to avoid import errors when the repositories module is
+# loaded in isolation (e.g., by test_repositories.py which manipulates sys.path)
+try:
+    from .sqlite import SQLiteHealthRepository
+except ImportError:
+    # Will be available when imported through the main garmindb package
+    SQLiteHealthRepository = None
+
+__all__ = ["HealthRepository", "SQLiteHealthRepository"]
