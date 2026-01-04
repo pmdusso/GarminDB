@@ -192,19 +192,98 @@ format_version: "1.0"
         lines.append("## Activity Summary")
         period = f"{result.period_start} to {result.period_end}"
         lines.append(f"\n*Period: {period}*\n")
+
+        # Basic totals
         lines.append(f"- **Total Activities:** {result.total_activities}")
         duration = result.total_duration_hours
         lines.append(f"- **Total Duration:** {duration:.1f} hours")
         distance = result.total_distance_km
         lines.append(f"- **Total Distance:** {distance:.1f} km")
         lines.append(f"- **Total Calories:** {result.total_calories:,}")
+        lines.append("")
 
-        if result.activities_by_sport:
-            lines.append("\n### By Sport\n")
-            for sport, count in sorted(result.activities_by_sport.items()):
-                lines.append(f"- **{sport}:** {count}")
+        # Training Stress Metrics (TSB)
+        if result.training_stress:
+            ts = result.training_stress
+            lines.append("### Training Load\n")
+            lines.append(f"- **Fitness (CTL):** {ts.ctl:.0f}")
+            lines.append(f"- **Fatigue (ATL):** {ts.atl:.0f}")
+            tsb_label = self._tsb_form_label(ts.tsb)
+            lines.append(f"- **Form (TSB):** {ts.tsb:.0f} ({tsb_label})")
+            if ts.monotony is not None:
+                lines.append(f"- **Monotony:** {ts.monotony:.2f}")
+                lines.append(f"- **Strain:** {ts.strain:.0f}")
+            if ts.confidence_score < 0.7:
+                conf_pct = ts.confidence_score * 100
+                lines.append(f"- **Data Confidence:** {conf_pct:.0f}% ⚠️")
+            lines.append("")
+
+        # Intensity Distribution with ASCII progress bars
+        if result.intensity_distribution:
+            lines.append("### Intensity Distribution\n")
+            lines.append("```")
+            categories = [
+                "Recovery", "Base", "Improving",
+                "Highly Improving", "Overreaching"
+            ]
+            for cat in categories:
+                pct = result.intensity_distribution.get(cat, 0)
+                bar = self._progress_bar(pct)
+                lines.append(f"{cat:17s} {bar} {pct:5.1f}%")
+            lines.append("```")
+            lines.append("")
+
+        # Training Effect averages
+        if result.avg_aerobic_effect > 0:
+            lines.append("### Training Effect\n")
+            lines.append(f"- **Avg Aerobic Effect:** {result.avg_aerobic_effect:.1f}")
+            if result.avg_anaerobic_effect > 0:
+                anaerobic = result.avg_anaerobic_effect
+                lines.append(f"- **Avg Anaerobic Effect:** {anaerobic:.1f}")
+            lines.append("")
+
+        # Sport Summaries table
+        if result.sport_summaries:
+            lines.append("### By Sport\n")
+            lines.append("| Sport | Count | Distance | Duration | Efficiency |")
+            lines.append("|-------|-------|----------|----------|------------|")
+            for name, summary in sorted(result.sport_summaries.items()):
+                dist = f"{summary.total_distance_km:.1f} km"
+                dur = f"{summary.total_duration_hours:.1f} h"
+                if summary.efficiency_index:
+                    eff = f"{summary.efficiency_index:.1f}"
+                else:
+                    eff = "---"
+                row = f"| {name} | {summary.count} | {dist} | {dur} | {eff} |"
+                lines.append(row)
+            lines.append("")
+
+        # Insights
+        if result.insights:
+            lines.append("### Insights\n")
+            for insight in result.insights:
+                lines.append(self._render_insight(insight))
 
         return "\n".join(lines)
+
+    def _progress_bar(self, percent: float, width: int = 10) -> str:
+        """Create ASCII progress bar."""
+        filled = int(percent / 100 * width)
+        empty = width - filled
+        return f"[{'=' * filled}{' ' * empty}]"
+
+    def _tsb_form_label(self, tsb: float) -> str:
+        """Get form label for TSB value."""
+        if tsb > 25:
+            return "peak form"
+        elif tsb > 5:
+            return "fresh"
+        elif tsb >= -10:
+            return "neutral"
+        elif tsb >= -30:
+            return "tired"
+        else:
+            return "fatigued"
 
     def _render_recovery(self, result: "RecoveryAnalysisResult") -> str:
         """Render recovery analysis section."""

@@ -8,6 +8,7 @@ from .models import HealthReport, InsightSeverity
 from .sleep_analyzer import SleepAnalyzer
 from .recovery_analyzer import RecoveryAnalyzer
 from .stress_analyzer import StressAnalyzer
+from .activity_analyzer import ActivityAnalyzer
 
 
 class HealthAnalyzer:
@@ -22,6 +23,7 @@ class HealthAnalyzer:
         self.sleep = SleepAnalyzer(repository)
         self.recovery = RecoveryAnalyzer(repository)
         self.stress = StressAnalyzer(repository)
+        self.activities = ActivityAnalyzer(repository)
 
     def daily_report(self, day: Optional[date] = None) -> HealthReport:
         """Generate report for a single day."""
@@ -47,8 +49,9 @@ class HealthAnalyzer:
         sleep_result = self.sleep.analyze(start_date, end_date)
         recovery_result = self.recovery.analyze(start_date, end_date)
         stress_result = self.stress.analyze(start_date, end_date)
+        activities_result = self.activities.analyze(start_date, end_date)
         key_insights = self._collect_key_insights(
-            sleep_result, recovery_result, stress_result
+            sleep_result, recovery_result, stress_result, activities_result
         )
 
         return HealthReport(
@@ -58,10 +61,11 @@ class HealthAnalyzer:
             sleep=sleep_result,
             recovery=recovery_result,
             stress=stress_result,
+            activities=activities_result,
             key_insights=key_insights,
             metadata={
                 "version": "1.0",
-                "analyzers": ["sleep", "recovery", "stress"],
+                "analyzers": ["sleep", "recovery", "stress", "activities"],
             },
         )
 

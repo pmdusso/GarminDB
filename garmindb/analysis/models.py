@@ -107,6 +107,37 @@ class PostActivityStressPattern:
 
 
 @dataclass
+class TrainingStressMetrics:
+    """Training load metrics using TSB model.
+
+    TSB (Training Stress Balance) = CTL - ATL, represents "form".
+    - Positive TSB: Fresh/recovered
+    - Negative TSB: Fatigued
+    """
+
+    atl: float  # Acute Training Load (7-day EMA) - Fatigue
+    ctl: float  # Chronic Training Load (42-day EMA) - Fitness
+    tsb: float  # Training Stress Balance (CTL - ATL) - Form
+    monotony: Optional[float]  # Mean / StdDev (None if < 7 days)
+    strain: float  # Weekly Load × Monotony (0.0 if monotony is None)
+    confidence_score: float  # Real load / Total load (0-1.0, based on volume)
+
+
+@dataclass
+class SportSummary:
+    """Per-sport activity breakdown with efficiency metrics."""
+
+    name: str
+    count: int
+    total_distance_km: float
+    total_duration_hours: float
+    avg_speed_kmh: Optional[float] = None
+    avg_hr: Optional[float] = None
+    max_training_effect: float = 0.0
+    efficiency_index: Optional[float] = None  # velocity / HR (higher = fitter)
+
+
+@dataclass
 class SleepAnalysisResult:
     """Complete sleep analysis result."""
 
@@ -235,28 +266,46 @@ class RecoveryAnalysisResult:
 
 @dataclass
 class ActivityAnalysisResult:
-    """Activity/training analysis result."""
+    """Complete activity analysis result with training load management."""
 
     period_start: date
     period_end: date
 
-    # Counts
+    # Totals
     total_activities: int
-
-    # Metrics
     total_duration_hours: float
     total_distance_km: float
     total_calories: int
 
-    # Optional/default fields
-    activities_by_sport: Dict[str, int] = field(default_factory=dict)
-    avg_training_effect: Optional[float] = None
+    # Load Management (Axis A)
+    training_stress: Optional['TrainingStressMetrics'] = None
+    daily_load_series: Dict[date, float] = field(default_factory=dict)
+
+    # Sport Breakdown
+    sport_summaries: Dict[str, 'SportSummary'] = field(default_factory=dict)
+
+    # Intensity Distribution (Axis B)
+    avg_aerobic_effect: float = 0.0
+    avg_anaerobic_effect: float = 0.0
+    intensity_distribution: Dict[str, float] = field(default_factory=dict)
+    # Keys: "Recovery", "Base", "Improving", "Highly Improving", "Overreaching"
 
     # Trends
     weekly_volume_trend: TrendDirection = TrendDirection.STABLE
 
     # Insights
     insights: List[Insight] = field(default_factory=list)
+
+    # Legacy compatibility
+    @property
+    def activities_by_sport(self) -> Dict[str, int]:
+        """Return sport counts for backward compatibility."""
+        return {name: s.count for name, s in self.sport_summaries.items()}
+
+    @property
+    def avg_training_effect(self) -> Optional[float]:
+        """Return average aerobic effect for backward compatibility."""
+        return self.avg_aerobic_effect if self.avg_aerobic_effect > 0 else None
 
 
 @dataclass

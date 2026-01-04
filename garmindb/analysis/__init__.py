@@ -8,6 +8,8 @@ from .models import (
     StressLoadMetric,
     HourlyStressPattern,
     PostActivityStressPattern,
+    TrainingStressMetrics,
+    SportSummary,
     SleepAnalysisResult,
     StressAnalysisResult,
     DailyReadinessResult,
@@ -18,6 +20,7 @@ from .models import (
 from .sleep_analyzer import SleepAnalyzer
 from .recovery_analyzer import RecoveryAnalyzer
 from .stress_analyzer import StressAnalyzer
+from .activity_analyzer import ActivityAnalyzer
 from .health_analyzer import HealthAnalyzer
 
 __all__ = [
@@ -28,6 +31,8 @@ __all__ = [
     "StressLoadMetric",
     "HourlyStressPattern",
     "PostActivityStressPattern",
+    "TrainingStressMetrics",
+    "SportSummary",
     "SleepAnalysisResult",
     "StressAnalysisResult",
     "DailyReadinessResult",
@@ -37,5 +42,6 @@ __all__ = [
     "SleepAnalyzer",
     "RecoveryAnalyzer",
     "StressAnalyzer",
+    "ActivityAnalyzer",
     "HealthAnalyzer",
 ]
