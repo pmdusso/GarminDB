@@ -146,14 +146,41 @@ format_version: "1.0"
         lines.append("## Stress Analysis")
         period = f"{result.period_start} to {result.period_end}"
         lines.append(f"\n*Period: {period}*\n")
+
+        # Summary Metrics
+        lines.append("### Key Metrics\n")
+        avg = result.avg_stress.current_value
+        lines.append(f"- **Average Stress:** {avg:.1f}")
+        if result.stress_load:
+            load = result.stress_load.total_load
+            lines.append(f"- **Total Stress Load:** {load:.0f} pts")
+            peak = result.stress_load.peak_load_hour
+            peak_str = peak.strftime('%H:%M') if peak else '---'
+            lines.append(f"- **Peak Load Hour:** {peak_str}")
+        baseline = result.personal_baseline
+        lines.append(f"- **Personal Baseline:** {baseline:.1f} (resting)\n")
+
+        # Distribution
         lines.append("### Distribution\n")
-        lines.append(f"- **Low Stress:** {result.low_stress_percent:.1f}%")
-        med_stress = result.medium_stress_percent
-        lines.append(f"- **Medium Stress:** {med_stress:.1f}%")
-        lines.append(f"- **High Stress:** {result.high_stress_percent:.1f}%")
+        low = result.low_stress_percent
+        med = result.medium_stress_percent
+        high = result.high_stress_percent
+        lines.append(f"- **Low Stress:** {low:.1f}%")
+        lines.append(f"- **Medium Stress:** {med:.1f}%")
+        lines.append(f"- **High Stress:** {high:.1f}%\n")
+
+        # Recovery Efficiency
+        if result.recovery_efficiency is not None:
+            lines.append("### Stress Resilience\n")
+            eff = result.recovery_efficiency
+            lines.append(f"- **Recovery Efficiency:** {eff:.0f}/100")
+            if result.avg_recovery_time_minutes:
+                avg_rec = result.avg_recovery_time_minutes
+                lines.append(f"- **Avg Recovery Time:** {avg_rec:.0f} min")
+            lines.append("")
 
         if result.insights:
-            lines.append("\n### Insights\n")
+            lines.append("### Insights\n")
             for insight in result.insights:
                 lines.append(self._render_insight(insight))
 
@@ -187,8 +214,12 @@ format_version: "1.0"
         lines.append(f"\n*Period: {period}*\n")
 
         # Recovery Score with trend
-        trend = result.recovery_trend.value if result.recovery_trend else "stable"
-        lines.append(f"**Recovery Score:** {result.recovery_score}/100 ({trend})\n")
+        if result.recovery_trend:
+            trend_val = result.recovery_trend.value
+        else:
+            trend_val = "stable"
+        score = result.recovery_score
+        lines.append(f"**Recovery Score:** {score}/100 ({trend_val})\n")
 
         # Summary metrics table
         lines.append("### Key Metrics\n")
@@ -201,12 +232,14 @@ format_version: "1.0"
 
         # Recovery indicators
         lines.append("### Recovery Indicators\n")
-        lines.append(f"- **RHR Baseline:** {result.rhr_baseline:.0f} bpm")
+        rhr_base = result.rhr_baseline
+        lines.append(f"- **RHR Baseline:** {rhr_base:.0f} bpm")
         if result.rhr_deviation != 0:
-            deviation_str = f"+{result.rhr_deviation:.1f}" if result.rhr_deviation > 0 \
-                else f"{result.rhr_deviation:.1f}"
-            lines.append(f"- **RHR Deviation:** {deviation_str} bpm from baseline")
-        lines.append(f"- **Weekly Training Load:** {result.weekly_tss:.0f} TSS")
+            dev = result.rhr_deviation
+            dev_str = f"+{dev:.1f}" if dev > 0 else f"{dev:.1f}"
+            lines.append(f"- **RHR Deviation:** {dev_str} bpm from baseline")
+        tss = result.weekly_tss
+        lines.append(f"- **Weekly Training Load:** {tss:.0f} TSS")
 
         if result.acute_chronic_ratio is not None:
             acwr = result.acute_chronic_ratio
@@ -218,9 +251,12 @@ format_version: "1.0"
         # Summary statistics
         if result.days_analyzed > 0:
             lines.append("### Period Statistics\n")
-            lines.append(f"- **Days Analyzed:** {result.days_analyzed}")
-            lines.append(f"- **High Recovery Days:** {result.high_recovery_days}")
-            lines.append(f"- **Low Recovery Days:** {result.low_recovery_days}")
+            days = result.days_analyzed
+            high_days = result.high_recovery_days
+            low_days = result.low_recovery_days
+            lines.append(f"- **Days Analyzed:** {days}")
+            lines.append(f"- **High Recovery Days:** {high_days}")
+            lines.append(f"- **Low Recovery Days:** {low_days}")
             lines.append("")
 
         # Insights

@@ -17,6 +17,7 @@ from .models import (
 )
 from .sleep_analyzer import SleepAnalyzer
 from .recovery_analyzer import RecoveryAnalyzer
+from .stress_analyzer import StressAnalyzer
 from .health_analyzer import HealthAnalyzer
 
 __all__ = [
@@ -35,5 +36,6 @@ __all__ = [
     "HealthReport",
     "SleepAnalyzer",
     "RecoveryAnalyzer",
+    "StressAnalyzer",
     "HealthAnalyzer",
 ]
