@@ -668,44 +668,55 @@ class ActivityAnalyzer:
         self,
         intensity_distribution: Dict[str, float]
     ) -> Optional[Insight]:
-        """Check for intensity imbalance (too much high intensity).
+        """Check for intensity imbalance using a polarized training model.
 
-        Args:
-            intensity_distribution: Percentage by intensity category
-
-        Returns:
-            Insight if imbalance detected, None otherwise
+        Criteria:
+        - ALERT: High Intensity (Highly Improving + Overreaching) > 30%
+        - WARNING: Low Intensity (Recovery + Base) < 50%
         """
         high_intensity_pct = sum(
             intensity_distribution.get(cat, 0)
-            for cat in ["Improving", "Highly Improving", "Overreaching"]
+            for cat in ["Highly Improving", "Overreaching"]
         )
+        low_intensity_pct = sum(
+            intensity_distribution.get(cat, 0)
+            for cat in ["Recovery", "Base"]
+        )
+        moderate_intensity_pct = intensity_distribution.get("Improving", 0)
 
-        if high_intensity_pct > 80:
+        if high_intensity_pct > 30:
             return Insight(
-                title="Intensity Imbalance Alert",
+                title="High Intensity Imbalance",
                 description=(
-                    f"{high_intensity_pct:.0f}% of your training is high-intensity. "
-                    f"This pattern increases burnout and overtraining risk."
+                    f"{high_intensity_pct:.0f}% of your training is at maximum intensity. "
+                    f"This significantly increases injury and overtraining risk."
                 ),
                 severity=InsightSeverity.ALERT,
                 category="activity",
                 data_points={"high_intensity_percent": high_intensity_pct},
                 recommendations=[
-                    "Add more low-intensity recovery sessions",
-                    "Target 80/20 distribution (80% easy, 20% hard)",
+                    "Reduce the number of anaerobic or threshold sessions",
+                    "Replace one hard session with a very easy recovery run",
+                    "Monitor HRV and resting HR closely"
                 ],
             )
-        elif high_intensity_pct > 70:
+        
+        if low_intensity_pct < 50 and (high_intensity_pct + moderate_intensity_pct) > 50:
             return Insight(
-                title="High Intensity Training",
+                title="Lack of Base Training",
                 description=(
-                    f"{high_intensity_pct:.0f}% of your training is high-intensity. "
-                    f"Consider adding more recovery sessions."
+                    f"Only {low_intensity_pct:.0f}% of your training is low-intensity. "
+                    "You are spending too much time in the 'moderate' zone, which "
+                    "can lead to stagnation without building a strong aerobic base."
                 ),
                 severity=InsightSeverity.WARNING,
                 category="activity",
-                data_points={"high_intensity_percent": high_intensity_pct},
-                recommendations=["Include 2-3 easy sessions per week"],
+                data_points={"low_intensity_percent": low_intensity_pct},
+                recommendations=[
+                    "Increase the proportion of easy (Zone 2) sessions",
+                    "Focus on consistency over intensity for a few weeks",
+                    "Target an 80/20 intensity distribution"
+                ],
             )
+            
         return None
