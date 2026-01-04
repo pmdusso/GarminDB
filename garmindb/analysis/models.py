@@ -74,6 +74,39 @@ class Insight:
 
 
 @dataclass
+class StressLoadMetric:
+    """Stress load calculated as area under the curve."""
+
+    period_minutes: int
+    total_load: float
+    avg_intensity: float
+    peak_load_hour: Optional[time] = None
+
+
+@dataclass
+class HourlyStressPattern:
+    """Stress pattern for a specific hour of day."""
+
+    hour: int
+    avg_stress: float
+    sample_count: int
+    category_distribution: Dict[str, float] = field(default_factory=dict)
+
+
+@dataclass
+class PostActivityStressPattern:
+    """Post-activity stress recovery pattern."""
+
+    activity_id: str
+    activity_sport: str
+    activity_end_time: datetime
+    pre_activity_stress: float
+    peak_post_stress: float
+    stress_load_2h: float
+    recovery_time_minutes: Optional[int] = None
+
+
+@dataclass
 class SleepAnalysisResult:
     """Complete sleep analysis result."""
 
@@ -121,6 +154,23 @@ class StressAnalysisResult:
 
     # Raw data for charts
     daily_avg_stress: Dict[date, float] = field(default_factory=dict)
+
+    # NEW: Stress Load (AUC-based cumulative metric)
+    stress_load: Optional['StressLoadMetric'] = None
+
+    # NEW: Temporal patterns
+    hourly_patterns: List['HourlyStressPattern'] = field(default_factory=list)
+    weekday_avg: Dict[str, float] = field(default_factory=dict)
+
+    # NEW: Post-activity recovery analysis
+    post_activity_patterns: List['PostActivityStressPattern'] = field(
+        default_factory=list
+    )
+    avg_recovery_time_minutes: Optional[float] = None
+    recovery_efficiency: Optional[float] = None  # 0-100
+
+    # NEW: Personal baseline (25th percentile of resting stress)
+    personal_baseline: float = 25.0
 
 
 @dataclass
