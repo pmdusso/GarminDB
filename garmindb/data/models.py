@@ -121,6 +121,7 @@ class DailySummaryRecord:
     stress_avg: Optional[int] = None
     bb_max: Optional[int] = None
     bb_min: Optional[int] = None
+    bb_charged: Optional[int] = None  # Overnight recharge amount
     steps: Optional[int] = None
     floors: Optional[int] = None
     distance: Optional[float] = None  # km

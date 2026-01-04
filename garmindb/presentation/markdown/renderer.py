@@ -6,6 +6,7 @@ if TYPE_CHECKING:
     from garmindb.analysis.models import (
         SleepAnalysisResult,
         StressAnalysisResult,
+        RecoveryAnalysisResult,
         ActivityAnalysisResult,
         HealthReport,
         MetricSummary,
@@ -41,6 +42,9 @@ class MarkdownPresenter(Presenter):
 
         if report.sleep:
             sections.append(self.render_sleep(report.sleep))
+
+        if report.recovery:
+            sections.append(self._render_recovery(report.recovery))
 
         if report.stress:
             sections.append(self._render_stress(report.stress))
@@ -174,3 +178,66 @@ format_version: "1.0"
                 lines.append(f"- **{sport}:** {count}")
 
         return "\n".join(lines)
+
+    def _render_recovery(self, result: "RecoveryAnalysisResult") -> str:
+        """Render recovery analysis section."""
+        lines = []
+        lines.append("## Recovery Analysis")
+        period = f"{result.period_start} to {result.period_end}"
+        lines.append(f"\n*Period: {period}*\n")
+
+        # Recovery Score with trend
+        trend = result.recovery_trend.value if result.recovery_trend else "stable"
+        lines.append(f"**Recovery Score:** {result.recovery_score}/100 ({trend})\n")
+
+        # Summary metrics table
+        lines.append("### Key Metrics\n")
+        lines.append("| Metric | Current | 7-day Avg | Trend |")
+        lines.append("|--------|---------|-----------|-------|")
+        lines.append(self._metric_row(result.rhr_summary))
+        lines.append(self._metric_row(result.body_battery_summary))
+        lines.append(self._metric_row(result.training_load_summary))
+        lines.append("")
+
+        # Recovery indicators
+        lines.append("### Recovery Indicators\n")
+        lines.append(f"- **RHR Baseline:** {result.rhr_baseline:.0f} bpm")
+        if result.rhr_deviation != 0:
+            deviation_str = f"+{result.rhr_deviation:.1f}" if result.rhr_deviation > 0 \
+                else f"{result.rhr_deviation:.1f}"
+            lines.append(f"- **RHR Deviation:** {deviation_str} bpm from baseline")
+        lines.append(f"- **Weekly Training Load:** {result.weekly_tss:.0f} TSS")
+
+        if result.acute_chronic_ratio is not None:
+            acwr = result.acute_chronic_ratio
+            risk = self._acwr_risk_label(acwr)
+            lines.append(f"- **Acute:Chronic Ratio:** {acwr:.2f} ({risk})")
+
+        lines.append("")
+
+        # Summary statistics
+        if result.days_analyzed > 0:
+            lines.append("### Period Statistics\n")
+            lines.append(f"- **Days Analyzed:** {result.days_analyzed}")
+            lines.append(f"- **High Recovery Days:** {result.high_recovery_days}")
+            lines.append(f"- **Low Recovery Days:** {result.low_recovery_days}")
+            lines.append("")
+
+        # Insights
+        if result.insights:
+            lines.append("### Insights\n")
+            for insight in result.insights:
+                lines.append(self._render_insight(insight))
+
+        return "\n".join(lines)
+
+    def _acwr_risk_label(self, acwr: float) -> str:
+        """Get risk label for ACWR value."""
+        if acwr < 0.8:
+            return "undertrained"
+        elif acwr <= 1.3:
+            return "optimal zone"
+        elif acwr <= 1.5:
+            return "elevated risk"
+        else:
+            return "high injury risk"

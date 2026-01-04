@@ -124,8 +124,8 @@ class StressAnalysisResult:
 
 
 @dataclass
-class RecoveryAnalysisResult:
-    """Recovery and readiness analysis."""
+class DailyReadinessResult:
+    """Daily recovery and readiness snapshot."""
 
     analysis_date: date
 
@@ -146,6 +146,41 @@ class RecoveryAnalysisResult:
 
     # Insights
     insights: List[Insight] = field(default_factory=list)
+
+
+@dataclass
+class RecoveryAnalysisResult:
+    """Result of recovery analysis for a period.
+
+    Analyzes RHR trends, Body Battery patterns, and training load
+    to assess overall recovery status and injury risk.
+    """
+
+    period_start: date
+    period_end: date
+
+    # Recovery Score (0-100)
+    recovery_score: int
+    recovery_trend: TrendDirection
+
+    # Component Metrics
+    rhr_summary: MetricSummary
+    body_battery_summary: MetricSummary
+    training_load_summary: MetricSummary
+
+    # Specialized Recovery Metrics
+    rhr_baseline: float
+    rhr_deviation: float
+    weekly_tss: float
+    acute_chronic_ratio: Optional[float] = None
+
+    # Insights
+    insights: List[Insight] = field(default_factory=list)
+
+    # Summary Statistics
+    days_analyzed: int = 0
+    high_recovery_days: int = 0
+    low_recovery_days: int = 0
 
 
 @dataclass

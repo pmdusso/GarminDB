@@ -427,6 +427,7 @@ class SQLiteHealthRepository(HealthRepository):
                     stress_avg=getattr(row, 'stress_avg', None),
                     bb_max=getattr(row, 'bb_max', None),
                     bb_min=getattr(row, 'bb_min', None),
+                    bb_charged=getattr(row, 'bb_charged', None),
                     steps=getattr(row, 'steps', None),
                     floors=floors,
                     distance=getattr(row, 'activities_distance', None),

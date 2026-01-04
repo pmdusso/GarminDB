@@ -6,6 +6,7 @@ from typing import Optional
 from garmindb.data.repositories.base import HealthRepository
 from .models import HealthReport, InsightSeverity
 from .sleep_analyzer import SleepAnalyzer
+from .recovery_analyzer import RecoveryAnalyzer
 
 
 class HealthAnalyzer:
@@ -18,6 +19,7 @@ class HealthAnalyzer:
         """Initialize with a health data repository."""
         self.repository = repository
         self.sleep = SleepAnalyzer(repository)
+        self.recovery = RecoveryAnalyzer(repository)
 
     def daily_report(self, day: Optional[date] = None) -> HealthReport:
         """Generate report for a single day."""
@@ -41,17 +43,19 @@ class HealthAnalyzer:
     ) -> HealthReport:
         """Generate comprehensive health report for period."""
         sleep_result = self.sleep.analyze(start_date, end_date)
-        key_insights = self._collect_key_insights(sleep_result)
+        recovery_result = self.recovery.analyze(start_date, end_date)
+        key_insights = self._collect_key_insights(sleep_result, recovery_result)
 
         return HealthReport(
             generated_at=datetime.now(),
             period_start=start_date,
             period_end=end_date,
             sleep=sleep_result,
+            recovery=recovery_result,
             key_insights=key_insights,
             metadata={
                 "version": "1.0",
-                "analyzers": ["sleep"],
+                "analyzers": ["sleep", "recovery"],
             },
         )
 
