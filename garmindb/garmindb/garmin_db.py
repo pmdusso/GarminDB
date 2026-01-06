@@ -443,6 +443,7 @@ class DailySummary(GarminDb.Base, idbutils.DbObject):
             'rr_waking_avg'             : cls.s_get_col_avg(session, cls.rr_waking_avg, start_ts, end_ts),
             'rr_max'                    : cls.s_get_col_max(session, cls.rr_max, start_ts, end_ts),
             'rr_min'                    : cls.s_get_col_min(session, cls.rr_min, start_ts, end_ts),
+            'bb_charged'                : cls.s_get_col_avg(session, cls.bb_charged, start_ts, end_ts),
             'bb_max'                    : cls.s_get_col_avg(session, cls.bb_max, start_ts, end_ts),
             'bb_min'                    : cls.s_get_col_avg(session, cls.bb_min, start_ts, end_ts),
         }

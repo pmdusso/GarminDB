@@ -15,7 +15,7 @@ from idbutils import DbObject
 class SummaryBase(DbObject):
     """Base class for implementing summary database objects."""
 
-    view_version = 10
+    view_version = 11
     _table_version = 5
     _col_units = {'hr_avg': 'bpm', 'hr_min': 'bpm', 'hr_max': 'bpm', 'rhr_avg': 'bpm', 'rhr_min': 'bpm', 'rhr_max': 'bpm', 'rr_waking_avg': 'brpm', 'rr_max': 'brpm',
                   'rr_min': 'brpm'}
@@ -66,6 +66,7 @@ class SummaryBase(DbObject):
     rr_waking_avg = Column(Float)
     rr_max = Column(Float)
     rr_min = Column(Float)
+    bb_charged = Column(Integer)
     bb_max = Column(Integer)
     bb_min = Column(Integer)
 
@@ -217,6 +218,7 @@ class SummaryBase(DbObject):
             cls.round_col('rr_waking_avg'),
             cls.round_col('rr_max'),
             cls.round_col('rr_min'),
+            cls.round_col('bb_charged'),
             cls.round_col('bb_max'),
             cls.round_col('bb_min')
         ]
