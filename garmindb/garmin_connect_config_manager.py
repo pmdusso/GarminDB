@@ -169,10 +169,10 @@ class GarminConnectConfigManager(JsonConfig):
             try:
                 password = subprocess.check_output(["security", "find-internet-password", "-s", domain, "-w"])
                 if password:
-                    return password.rstrip()
+                    return password.decode(encoding="utf-8").rstrip()
             except Exception:
                 pass
-            raise ConfigException(f'Secure password was specified but no "Internet Password" entry was found in the Login Keychain for https://{domain}')
+            raise ConfigException(f'Secure password was specified but no "Internet Password" entry was found in the Login Keychain for https:////{domain}')
 
     def get_password_from_file(self):
         """Read the Garmin Connect password from a file."""
