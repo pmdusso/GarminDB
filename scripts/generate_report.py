@@ -48,34 +48,72 @@ def main():
         action="store_true",
         help="Exclude YAML frontmatter",
     )
+    parser.add_argument(
+        "--performance",
+        action="store_true",
+        help="Generate the performance report (power/W-kg/TSB/recovery)",
+    )
 
     args = parser.parse_args()
 
     # Import here to avoid slow startup for --help
     from garmindb import GarminConnectConfigManager
-    from garmindb.data.repositories import SQLiteHealthRepository
-    from garmindb.analysis import HealthAnalyzer
-    from garmindb.presentation import MarkdownPresenter
 
-    # Setup
     gc_config = GarminConnectConfigManager()
     db_params = gc_config.get_db_params()
-    repository = SQLiteHealthRepository(db_params)
-    analyzer = HealthAnalyzer(repository)
-    presenter = MarkdownPresenter(include_metadata=not args.no_metadata)
 
-    # Generate report
-    if args.start and args.end:
-        report = analyzer.generate_report(args.start, args.end)
-    elif args.period == "daily":
-        report = analyzer.daily_report()
-    elif args.period == "monthly":
-        report = analyzer.monthly_report()
+    if args.performance:
+        import os
+        from datetime import datetime as _dt
+        from datetime import timedelta as _td
+        from garmindb.data.repositories import SQLiteHealthRepository
+        from garmindb.analysis.performance_targets import load_performance_targets
+        from garmindb.analysis.performance_report import PerformanceReportBuilder
+        from garmindb.analysis.report_state import load_last_metrics, save_metrics
+        from garmindb.presentation.markdown.performance_renderer import PerformancePresenter
+
+        db_dir = db_params.db_path
+        activities_dir = os.path.join(
+            os.path.dirname(db_dir), "FitFiles", "Activities"
+        )
+        state_path = os.path.join(
+            os.path.dirname(db_dir), "reports", "last_metrics.json"
+        )
+
+        end = args.end or date.today()
+        start = args.start or (end - _td(days=30))
+        generated = _dt(end.year, end.month, end.day, 12, 0, 0)
+
+        repository = SQLiteHealthRepository(db_params)
+        targets = load_performance_targets()
+        last = load_last_metrics(state_path)
+
+        builder = PerformanceReportBuilder(
+            repository=repository, db_dir=db_dir, activities_dir=activities_dir,
+            targets=targets, last_metrics=last,
+        )
+        report = builder.build(start, end, generated)
+        save_metrics(state_path, report.metric_snapshot, generated.isoformat())
+        markdown = PerformancePresenter(
+            include_metadata=not args.no_metadata
+        ).render(report)
     else:
-        report = analyzer.weekly_report()
+        from garmindb.data.repositories import SQLiteHealthRepository
+        from garmindb.analysis import HealthAnalyzer
+        from garmindb.presentation import MarkdownPresenter
 
-    # Render
-    markdown = presenter.render_report(report)
+        repository = SQLiteHealthRepository(db_params)
+        analyzer = HealthAnalyzer(repository)
+        presenter = MarkdownPresenter(include_metadata=not args.no_metadata)
+        if args.start and args.end:
+            report = analyzer.generate_report(args.start, args.end)
+        elif args.period == "daily":
+            report = analyzer.daily_report()
+        elif args.period == "monthly":
+            report = analyzer.monthly_report()
+        else:
+            report = analyzer.weekly_report()
+        markdown = presenter.render_report(report)
 
     # Output
     if args.output:

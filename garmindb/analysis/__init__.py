@@ -22,6 +22,8 @@ from .recovery_analyzer import RecoveryAnalyzer
 from .stress_analyzer import StressAnalyzer
 from .activity_analyzer import ActivityAnalyzer
 from .health_analyzer import HealthAnalyzer
+from .performance_report import PerformanceReport, PerformanceReportBuilder  # noqa: F401
+from .performance_targets import PerformanceTargets, load_performance_targets  # noqa: F401
 
 __all__ = [
     "TrendDirection",
@@ -44,4 +46,8 @@ __all__ = [
     "StressAnalyzer",
     "ActivityAnalyzer",
     "HealthAnalyzer",
+    "PerformanceReport",
+    "PerformanceReportBuilder",
+    "PerformanceTargets",
+    "load_performance_targets",
 ]
