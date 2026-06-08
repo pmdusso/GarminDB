@@ -120,6 +120,24 @@ class SQLiteHealthRepository(HealthRepository):
         """
         return datetime.combine(d, datetime.max.time())
 
+    def _to_date(self, value):
+        """Normalize a DB ``day`` value to a plain ``date``.
+
+        GarminDB migrated ``day`` columns from Date to DateTime (upstream
+        issue #300), so SQLAlchemy may now return ``datetime`` where the
+        DTO contract expects ``date``. Note ``datetime`` is a subclass of
+        ``date``, so the ``datetime`` check must come first.
+
+        Args:
+            value: A ``date`` or ``datetime`` (or None).
+
+        Returns:
+            A ``date`` (or the original value if not a date/datetime).
+        """
+        if isinstance(value, datetime):
+            return value.date()
+        return value
+
     def _time_to_timedelta(self, t: Optional[dt_time]) -> timedelta:
         """Convert time object to timedelta.
 
@@ -158,7 +176,7 @@ class SQLiteHealthRepository(HealthRepository):
         for row in raw_data:
             try:
                 record = SleepRecord(
-                    date=row.day,
+                    date=self._to_date(row.day),
                     total_sleep=self._time_to_timedelta(row.total_sleep),
                     deep_sleep=self._time_to_timedelta(row.deep_sleep),
                     light_sleep=self._time_to_timedelta(row.light_sleep),
@@ -422,7 +440,7 @@ class SQLiteHealthRepository(HealthRepository):
                 floors = int(floors_val) if floors_val else None
 
                 record = DailySummaryRecord(
-                    date=row.day,
+                    date=self._to_date(row.day),
                     resting_hr=resting_hr,
                     stress_avg=getattr(row, 'stress_avg', None),
                     bb_max=getattr(row, 'bb_max', None),
