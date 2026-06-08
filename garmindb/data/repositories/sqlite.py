@@ -10,6 +10,7 @@ __author__ = "Tom Goetz"
 __copyright__ = "Copyright Tom Goetz"
 __license__ = "GPL"
 
+import logging
 from datetime import date, datetime, timedelta, time as dt_time
 from typing import List, Optional
 
@@ -22,6 +23,8 @@ from ..models import (
     ActivityRecord,
     DailySummaryRecord,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _import_weight_model():
@@ -488,6 +491,9 @@ class SQLiteHealthRepository(HealthRepository):
             try:
                 if row.weight is not None:
                     series.append((self._to_date(row.day), float(row.weight)))
-            except Exception:
+            except Exception as e:
+                # Stay resilient (skip the bad row) but leave a trace so dropped
+                # weigh-ins are diagnosable instead of silently vanishing.
+                logger.debug("Skipping malformed weight row %r: %s", row, e)
                 continue
         return sorted(series, key=lambda t: t[0])
