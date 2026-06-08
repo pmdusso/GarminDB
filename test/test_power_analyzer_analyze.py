@@ -69,3 +69,36 @@ def test_analyze_skips_corrupt_files_and_counts_them(tmp_path):
     assert result.rides_with_power == 1
     # Exactly one unreadable file was skipped.
     assert result.skipped_files == 1
+
+
+def test_ftp_needs_test_false_when_configured_below_best_20min(tmp_path):
+    # Configured FTP (250) is BELOW the observed best-20min (300): the number
+    # is conservative, no test is recommended and no FTP insight is emitted.
+    folder = str(tmp_path)
+    _write_ride(folder, 1, "2026-05-20", maxAvgPower_1200=300,
+                powerTimeInZone_2=1400.0)
+
+    analyzer = PowerAnalyzer(folder, configured_ftp=250)
+    result = analyzer.analyze(date(2026, 5, 1), date(2026, 6, 7))
+
+    assert result.best_20min_recent == 300
+    assert result.ftp_needs_test is False
+    assert not any("FTP" in i.title for i in result.insights)
+
+
+def test_ftp_needs_test_false_when_no_20min_data(tmp_path):
+    # A high configured FTP (400) but NO 20-min effort on disk: best_20min_recent
+    # is None. ftp_needs_test must be False and analyze() must not raise on the
+    # None-best path.
+    folder = str(tmp_path)
+    # A cycling ride with power, but only a 1-hour effort (no maxAvgPower_1200).
+    _write_ride(folder, 1, "2026-05-20", maxAvgPower_3600=240,
+                powerTimeInZone_2=1400.0)
+
+    analyzer = PowerAnalyzer(folder, configured_ftp=400)
+    result = analyzer.analyze(date(2026, 5, 1), date(2026, 6, 7))
+
+    assert result.best_20min_recent is None
+    assert result.estimated_ftp is None
+    assert result.ftp_needs_test is False
+    assert not any("FTP" in i.title for i in result.insights)

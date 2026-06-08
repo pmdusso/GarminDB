@@ -141,3 +141,27 @@ def test_render_no_coverage_when_power_missing():
     r.power = None
     md = PerformancePresenter().render(r)
     assert "Cobertura" not in md
+
+
+def test_render_ftp_scorecard_cell_from_estimate():
+    # When FTP came from the estimate, the builder formats it as "267 W"; the
+    # renderer must surface that cell verbatim in the scorecard table.
+    rows = [ScorecardRow("FTP", "267 W", "—", "—", None)]
+    md = PerformancePresenter(include_metadata=False).render(_report_with_rows(rows))
+    assert "| FTP | 267 W |" in md
+
+
+def test_render_priority_severity_emoji_prefixes():
+    # Priorities arrive pre-formatted with a severity emoji prefix; the renderer
+    # must preserve the 🚨 (ALERT) and ⚠️ (WARNING) markers in order.
+    r = _report()
+    r.priorities = [
+        "🚨 Overtraining risk: back off",
+        "⚠️ Elevated RHR: RHR up",
+        "⚠️ Poor sleep: short nights",
+    ]
+    md = PerformancePresenter(include_metadata=False).render(r)
+    assert "## Prioridades agora" in md
+    assert "1. 🚨 Overtraining risk" in md
+    assert "2. ⚠️ Elevated RHR" in md
+    assert "3. ⚠️ Poor sleep" in md

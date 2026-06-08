@@ -150,3 +150,89 @@ def test_deltas_present_with_prior(monkeypatch):
     last = {"metrics": {"wkg": 3.7}}
     report = _build(monkeypatch, last_metrics=last)
     assert report.deltas["wkg"].has_previous is True
+
+
+def _build_no_ftp(monkeypatch):
+    """Build with no configured FTP so the estimated FTP fallback is used."""
+    import garmindb.analysis.performance_report as mod
+    monkeypatch.setattr(mod, "_run_power", lambda d, ftp, s, e: _power_stub(ftp))
+    monkeypatch.setattr(mod, "_run_activity", lambda repo, s, e: _activity_result())
+    monkeypatch.setattr(mod, "_run_recovery", lambda repo, s, e: _recovery_result(60))
+    monkeypatch.setattr(mod, "_run_sleep", lambda repo, s, e: _sleep_result())
+    monkeypatch.setattr(mod, "_run_stress", lambda repo, s, e: _stress_result())
+    monkeypatch.setattr(mod, "get_latest_vo2max", lambda d, s, e: 56.0)
+    builder = PerformanceReportBuilder(
+        repository=_StubRepo(), db_dir="/tmp/db", activities_dir="/tmp/acts",
+        targets=PerformanceTargets(ftp_watts=None, weight_target_kg=80,
+                                   wkg_target=4.0, race_name="L'Etape",
+                                   race_date="2026-09-27"),
+        last_metrics=None,
+    )
+    return builder.build(date(2026, 5, 9), date(2026, 6, 7),
+                         datetime(2026, 6, 8, 12, 0, 0))
+
+
+def test_ftp_falls_back_to_estimated_when_unconfigured(monkeypatch):
+    # No configured FTP -> the builder must fall back to the power analyzer's
+    # estimated_ftp (267 W from the stub) for both ftp_used and the scorecard.
+    report = _build_no_ftp(monkeypatch)
+    assert report.ftp_used == 267
+    ftp_row = next(row for row in report.scorecard if row.label == "FTP")
+    assert ftp_row.current == "267 W"
+
+
+def _insight(title, severity, category):
+    return Insight(title, f"{title} detail", severity, category)
+
+
+def _stub_with_insights(*insights):
+    """A minimal analyzer-result stand-in carrying only an insights list."""
+    class _R:
+        def __init__(self, ins):
+            self.insights = list(ins)
+    return _R(insights)
+
+
+def test_priorities_rank_by_severity_drop_positive_and_cap_three(monkeypatch):
+    # One ALERT, two WARNING, one POSITIVE across the analyzers. Priorities
+    # must be capped at 3, the ALERT must lead, and the POSITIVE must drop.
+    import garmindb.analysis.performance_report as mod
+    alert = _insight("Overtraining risk", InsightSeverity.ALERT, "recovery")
+    warn1 = _insight("Elevated RHR", InsightSeverity.WARNING, "recovery")
+    warn2 = _insight("Poor sleep", InsightSeverity.WARNING, "sleep")
+    good = _insight("Great form", InsightSeverity.POSITIVE, "activity")
+
+    monkeypatch.setattr(mod, "_run_power",
+                        lambda d, ftp, s, e: _stub_with_insights())
+    monkeypatch.setattr(mod, "_run_activity",
+                        lambda repo, s, e: _stub_with_insights(good))
+    monkeypatch.setattr(mod, "_run_recovery",
+                        lambda repo, s, e: _stub_with_insights(alert, warn1))
+    monkeypatch.setattr(mod, "_run_sleep",
+                        lambda repo, s, e: _stub_with_insights(warn2))
+    monkeypatch.setattr(mod, "_run_stress",
+                        lambda repo, s, e: _stub_with_insights())
+
+    priorities = mod.PerformanceReportBuilder._priorities(
+        [_stub_with_insights(),
+         _stub_with_insights(good),
+         _stub_with_insights(alert, warn1),
+         _stub_with_insights(warn2),
+         _stub_with_insights()])
+
+    assert len(priorities) == 3
+    # The ALERT leads and carries its 🚨 emoji.
+    assert priorities[0].startswith("🚨")
+    assert "Overtraining risk" in priorities[0]
+    # The two WARNINGs follow, each with the ⚠️ emoji.
+    assert all("⚠️" in p for p in priorities[1:])
+    # The POSITIVE insight is dropped by the cap-3.
+    assert all("Great form" not in p for p in priorities)
+
+
+def test_readiness_score_boundaries(monkeypatch):
+    # Boundary scan with days_analyzed > 0: 49->🔴, 50->🟡, 69->🟡, 70->🟢.
+    assert _build(monkeypatch, recovery_score=49).readiness_light == "🔴"
+    assert _build(monkeypatch, recovery_score=50).readiness_light == "🟡"
+    assert _build(monkeypatch, recovery_score=69).readiness_light == "🟡"
+    assert _build(monkeypatch, recovery_score=70).readiness_light == "🟢"
