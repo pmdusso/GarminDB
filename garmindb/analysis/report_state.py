@@ -1,4 +1,3 @@
-# garmindb/analysis/report_state.py
 """Persist key report metrics between runs to compute deltas.
 
 State file shape: {"generated": "<iso>", "metrics": {name: value, ...}}
