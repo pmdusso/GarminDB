@@ -24,6 +24,12 @@ from ..models import (
 )
 
 
+def _import_weight_model():
+    """Import the GarminDB Weight model (indirection for testability)."""
+    from garmindb.garmindb import Weight
+    return Weight
+
+
 class SQLiteHealthRepository(HealthRepository):
     """SQLite implementation using existing GarminDB models.
 
@@ -459,3 +465,29 @@ class SQLiteHealthRepository(HealthRepository):
                 continue
 
         return sorted(records, key=lambda r: r.date)
+
+    def get_weight_series(
+        self, start_date: date, end_date: date
+    ) -> List[tuple]:
+        """Get (date, weight_kg) pairs for the range, ordered by date.
+
+        Args:
+            start_date: Inclusive range start.
+            end_date: Inclusive range end.
+
+        Returns:
+            List of (date, float) tuples sorted ascending by date.
+        """
+        Weight = _import_weight_model()
+        start_ts = self._to_datetime(start_date)
+        end_ts = self._to_datetime_end(end_date)
+        raw = Weight.get_for_period(self.garmin_db, start_ts, end_ts)
+
+        series = []
+        for row in raw:
+            try:
+                if row.weight is not None:
+                    series.append((self._to_date(row.day), float(row.weight)))
+            except Exception:
+                continue
+        return sorted(series, key=lambda t: t[0])
