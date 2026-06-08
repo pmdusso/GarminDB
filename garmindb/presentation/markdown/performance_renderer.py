@@ -25,6 +25,7 @@ class PerformancePresenter:
         parts.append(self._header(report))
         parts.append(self._readiness(report))
         parts.append(self._scorecard(report))
+        parts.append(self._coverage(report))
         parts.append(self._priorities(report))
         return "\n".join(p for p in parts if p).rstrip() + "\n"
 
@@ -76,6 +77,45 @@ class PerformancePresenter:
                 f"{row.gap} | {self._delta_cell(row)} |"
             )
         return "\n".join(lines) + "\n"
+
+    def _coverage(self, r: PerformanceReport) -> str:
+        """Disclose how much of the data backed the power numbers.
+
+        Without this, a report built on 2 of 40 rides looks identical to a
+        complete one. We surface the ride coverage, the analysed window,
+        any silently-skipped files, and an explicit warning when no ride
+        carried power (the meter likely was not recording).
+        """
+        power = r.power
+        if power is None:
+            logger.debug("No power block on report; skipping coverage line.")
+            return ""
+
+        line = (
+            f"_Cobertura: {power.rides_with_power} de {power.total_rides} "
+            f"pedais com potência (janela {power.period_start}–"
+            f"{power.period_end})"
+        )
+        skipped = getattr(power, "skipped_files", 0) or 0
+        if skipped > 0:
+            line += f"; {skipped} arquivos ilegíveis ignorados"
+            logger.warning(
+                "Power coverage: %d file(s) were unreadable and ignored.",
+                skipped,
+            )
+        line += "._"
+
+        parts = ["\n" + line]
+        if power.rides_with_power == 0 and power.total_rides > 0:
+            logger.warning(
+                "Power coverage: 0 of %d rides had power; meter likely "
+                "was not recording.", power.total_rides,
+            )
+            parts.append(
+                "\n> ⚠️ Nenhum pedal recente registrou potência — o "
+                "medidor de potência provavelmente não estava gravando."
+            )
+        return "\n".join(parts) + "\n"
 
     def _priorities(self, r: PerformanceReport) -> str:
         if not r.priorities:

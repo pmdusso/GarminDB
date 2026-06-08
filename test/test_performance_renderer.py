@@ -3,7 +3,19 @@ from datetime import date, datetime
 from garmindb.presentation.markdown.performance_renderer import PerformancePresenter
 from garmindb.analysis.performance_report import PerformanceReport, ScorecardRow
 from garmindb.analysis.performance_targets import PerformanceTargets
+from garmindb.analysis.power_analyzer import PowerAnalysisResult
 from garmindb.analysis.report_state import MetricDelta
+
+
+def _power(rides_with_power, total_rides, skipped_files=0):
+    return PowerAnalysisResult(
+        period_start=date(2026, 5, 9), period_end=date(2026, 6, 7),
+        configured_ftp=325, estimated_ftp=290, best_20min_recent=305,
+        best_20min_alltime=305, power_curve_recent={}, power_curve_alltime={},
+        power_zone_distribution={}, rides_with_power=rides_with_power,
+        total_rides=total_rides, ftp_needs_test=False,
+        skipped_files=skipped_files,
+    )
 
 
 def _report():
@@ -86,3 +98,46 @@ def test_delta_cell_absent_current_with_stale_previous_reads_sem_dado():
     rows = [ScorecardRow("VO2max", "—", "—", "—", MetricDelta(56.0, 56.0))]
     md = PerformancePresenter(include_metadata=False).render(_report_with_rows(rows))
     assert "sem dado" in md
+
+
+def _report_with_power(power):
+    r = _report()
+    r.power = power
+    return r
+
+
+def test_render_coverage_line():
+    # A report on a partial sample must disclose its coverage.
+    md = PerformancePresenter().render(_report_with_power(_power(2, 40)))
+    assert "Cobertura" in md
+    assert "2 de 40" in md
+    # The analysed window should appear in the coverage line.
+    assert "2026-05-09" in md and "2026-06-07" in md
+
+
+def test_render_coverage_includes_skipped_files():
+    md = PerformancePresenter().render(_report_with_power(_power(2, 40, skipped_files=3)))
+    assert "Cobertura" in md
+    assert "3 arquivos ilegíveis ignorados" in md
+
+
+def test_render_coverage_no_skipped_files_omits_phrase():
+    md = PerformancePresenter().render(_report_with_power(_power(2, 40, skipped_files=0)))
+    assert "ilegíveis" not in md
+
+
+def test_render_zero_power_warning():
+    # Rides exist but none has power -> warn the meter likely was not recording.
+    md = PerformancePresenter().render(_report_with_power(_power(0, 40)))
+    assert "Cobertura" in md
+    assert "0 de 40" in md
+    # An explicit warning about the power meter not recording.
+    assert "medidor de potência" in md.lower() or "power meter" in md.lower()
+
+
+def test_render_no_coverage_when_power_missing():
+    # If the report carries no power block, no coverage line is emitted.
+    r = _report()
+    r.power = None
+    md = PerformancePresenter().render(r)
+    assert "Cobertura" not in md
