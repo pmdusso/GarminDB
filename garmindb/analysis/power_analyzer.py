@@ -7,11 +7,14 @@ Garmin's pre-computed power fields (normPower, maxAvgPower_<seconds>,
 powerTimeInZone_<n>). This analyzer reads those at report time.
 """
 
+import glob
+import json
+import os
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
-from .models import Insight
+from .models import Insight, InsightSeverity
 
 # Durations (seconds) shown on the power curve.
 CURVE_DURATIONS = [5, 60, 300, 1200, 3600]
@@ -118,3 +121,91 @@ class PowerAnalyzer:
             if vals:
                 curve[d] = max(vals)
         return curve
+
+    def _load_rides(self) -> List["PowerRide"]:
+        """Glob the activities dir and parse all cycling rides with power."""
+        rides: List[PowerRide] = []
+        if not os.path.isdir(self._dir):
+            return rides
+        for path in glob.glob(os.path.join(self._dir, "activity_*.json")):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                continue
+            ride = self._parse_ride(data)
+            if ride is not None:
+                rides.append(ride)
+        return rides
+
+    @staticmethod
+    def _zone_distribution(rides: List["PowerRide"]) -> Dict[int, float]:
+        """Aggregate time-in-power-zone across rides into percentages."""
+        totals: Dict[int, float] = {}
+        for ride in rides:
+            for zone, secs in ride.power_time_in_zone.items():
+                totals[zone] = totals.get(zone, 0.0) + secs
+        grand = sum(totals.values())
+        if grand == 0:
+            return {}
+        return {z: round(secs / grand * 100, 1) for z, secs in sorted(totals.items())}
+
+    def analyze(self, start_date: date, end_date: date) -> "PowerAnalysisResult":
+        """Build a PowerAnalysisResult for the period.
+
+        'recent' = last RECENT_WINDOW_DAYS before end_date (current form);
+        'alltime' = every ride on disk (personal bests).
+        """
+        all_rides = self._load_rides()
+        recent_start = end_date - timedelta(days=self.RECENT_WINDOW_DAYS)
+        recent = [r for r in all_rides if recent_start <= r.date <= end_date]
+
+        curve_recent = self._best_curve(recent)
+        curve_all = self._best_curve(all_rides)
+        best20_recent = curve_recent.get(1200)
+        best20_all = curve_all.get(1200)
+        est_ftp = round(best20_recent * 0.95) if best20_recent else None
+        ftp_needs_test = bool(
+            self._ftp and best20_recent and self._ftp > best20_recent
+        )
+
+        result = PowerAnalysisResult(
+            period_start=start_date,
+            period_end=end_date,
+            configured_ftp=self._ftp,
+            estimated_ftp=est_ftp,
+            best_20min_recent=best20_recent,
+            best_20min_alltime=best20_all,
+            power_curve_recent=curve_recent,
+            power_curve_alltime=curve_all,
+            power_zone_distribution=self._zone_distribution(recent),
+            rides_with_power=len(recent),
+            total_rides=len(all_rides),
+            ftp_needs_test=ftp_needs_test,
+        )
+        result.insights = self._build_insights(result)
+        return result
+
+    def _build_insights(self, result: "PowerAnalysisResult") -> List[Insight]:
+        """Generate power insights (FTP test recommendation, etc.)."""
+        insights: List[Insight] = []
+        if result.ftp_needs_test:
+            insights.append(Insight(
+                title="Confirme sua FTP com um teste",
+                description=(
+                    f"Sua FTP configurada ({result.configured_ftp:.0f} W) é maior "
+                    f"que o melhor esforço de 20 min dos seus dados recentes "
+                    f"({result.best_20min_recent:.0f} W). Um teste de FTP "
+                    f"confirmaria o número atual."
+                ),
+                severity=InsightSeverity.INFO,
+                category="power",
+                data_points={
+                    "configured_ftp": result.configured_ftp,
+                    "best_20min_recent": result.best_20min_recent,
+                },
+                recommendations=[
+                    "Faça um teste de 20 min ou rampa nas próximas 2 semanas",
+                ],
+            ))
+        return insights
