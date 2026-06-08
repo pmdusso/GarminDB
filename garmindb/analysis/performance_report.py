@@ -204,6 +204,7 @@ class PerformanceReportBuilder:
 
     @staticmethod
     def _priorities(results) -> List[str]:
+        """Sort all analyzers' insights by severity and return the top 3."""
         insights: List[Insight] = []
         for r in results:
             insights.extend(getattr(r, "insights", []) or [])

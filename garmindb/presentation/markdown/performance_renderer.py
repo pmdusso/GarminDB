@@ -1,4 +1,3 @@
-# garmindb/presentation/markdown/performance_renderer.py
 """Render a PerformanceReport to Markdown."""
 
 import logging

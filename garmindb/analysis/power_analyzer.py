@@ -1,4 +1,3 @@
-# garmindb/analysis/power_analyzer.py
 """Cycling power analysis from raw Garmin activity JSONs.
 
 Power data is NOT imported into the GarminDB tables, but the per-activity
