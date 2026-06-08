@@ -1,8 +1,6 @@
 # test/test_performance_report.py
 from datetime import date, datetime
-from garmindb.analysis.performance_report import (
-    PerformanceReportBuilder, ScorecardRow,
-)
+from garmindb.analysis.performance_report import PerformanceReportBuilder
 from garmindb.analysis.performance_targets import PerformanceTargets
 from garmindb.analysis.models import (
     ActivityAnalysisResult, TrainingStressMetrics, RecoveryAnalysisResult,
