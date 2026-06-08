@@ -58,9 +58,9 @@ class GarminConnectConfigManager(JsonConfig):
             os.makedirs(dir)
         return dir
 
-    def get_session_file(self):
-        """Return the path to the session file."""
-        return self.config_dir + os.sep + 'garth_session'
+    def get_token_store_file(self):
+        """Return the path to the Garmin Connect DI OAuth2 token store."""
+        return self.config_dir + os.sep + 'garmin_tokens.json'
 
     def get_db_type(self):
         """Return the type (SQLite, MySQL, etc) of database that is configured."""
@@ -169,10 +169,10 @@ class GarminConnectConfigManager(JsonConfig):
             try:
                 password = subprocess.check_output(["security", "find-internet-password", "-s", domain, "-w"])
                 if password:
-                    return password.rstrip()
+                    return password.decode(encoding="utf-8").rstrip()
             except Exception:
                 pass
-            raise ConfigException(f'Secure password was specified but no "Internet Password" entry was found in the Login Keychain for https://{domain}')
+            raise ConfigException(f'Secure password was specified but no "Internet Password" entry was found in the Login Keychain for https:////{domain}')
 
     def get_password_from_file(self):
         """Read the Garmin Connect password from a file."""
@@ -214,6 +214,12 @@ class GarminConnectConfigManager(JsonConfig):
     def stat_start_date(self, stat_type):
         """Return a tuple containing the start date and the number of days to fetch stats from."""
         start_date = self.get_node_value('data', stat_type + '_start_date')
+        if start_date is None:
+            # Fallback to a general start date or a reasonable default
+            start_date = self.get_node_value('data', 'start_date')
+        if start_date is None:
+            # If still nothing, default to 20 days ago
+            start_date = datetime.datetime.now().date() - datetime.timedelta(days=20)
         end_date = self.get_node_value_default('data', stat_type + '_end_date', datetime.datetime.now().date())
         days = (end_date - start_date).days
         return (start_date, days)
