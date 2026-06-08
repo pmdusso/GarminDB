@@ -7,18 +7,14 @@ Garmin's pre-computed power fields (normPower, maxAvgPower_<seconds>,
 powerTimeInZone_<n>). This analyzer reads those at report time.
 """
 
-import glob
-import json
-import os
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Dict, List, Optional
 
-from .models import Insight, InsightSeverity
+from .models import Insight
 
 # Durations (seconds) shown on the power curve.
 CURVE_DURATIONS = [5, 60, 300, 1200, 3600]
-DURATION_LABELS = {5: "5s", 60: "1min", 300: "5min", 1200: "20min", 3600: "60min"}
 
 CYCLING_TYPES = {
     "cycling", "virtual_ride", "road_biking", "indoor_cycling",
