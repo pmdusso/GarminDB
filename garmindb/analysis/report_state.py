@@ -4,9 +4,12 @@ State file shape: {"generated": "<iso>", "metrics": {name: value, ...}}
 """
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from typing import Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -15,7 +18,17 @@ class MetricDelta:
 
     current: float
     previous: Optional[float]
-    delta: Optional[float]  # current - previous, or None on first run
+
+    @property
+    def delta(self) -> Optional[float]:
+        """Derived: current - previous, or None on first run.
+
+        Computed (not stored) so it can never drift out of sync with
+        ``current``/``previous``.
+        """
+        if self.previous is None:
+            return None
+        return self.current - self.previous
 
     @property
     def has_previous(self) -> bool:
@@ -36,6 +49,27 @@ def save_metrics(path: str, metrics: Dict[str, float], generated_iso: str) -> No
     payload = {"generated": generated_iso, "metrics": metrics}
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
+    logger.debug("Saved %d metric(s) to %s", len(metrics), path)
+
+
+def merge_metrics(
+    previous: Optional[dict], current: Dict[str, float]
+) -> Dict[str, float]:
+    """Carry forward last-known values for metrics absent this run.
+
+    A metric that is None this run is dropped from ``current`` upstream, so
+    naively persisting ``current`` would destroy its baseline after a single
+    gap. Merging the new snapshot onto the previous metrics keeps the baseline
+    alive while still letting present metrics update.
+    """
+    prev_metrics = (previous or {}).get("metrics", {})
+    merged = dict(prev_metrics)
+    merged.update(current)
+    carried = set(prev_metrics) - set(current)
+    if carried:
+        logger.debug("Carried forward %d stale metric(s): %s",
+                     len(carried), sorted(carried))
+    return merged
 
 
 def compute_deltas(
@@ -46,6 +80,5 @@ def compute_deltas(
     result: Dict[str, MetricDelta] = {}
     for name, value in current.items():
         prev = prev_metrics.get(name)
-        delta = (value - prev) if prev is not None else None
-        result[name] = MetricDelta(current=value, previous=prev, delta=delta)
+        result[name] = MetricDelta(current=value, previous=prev)
     return result

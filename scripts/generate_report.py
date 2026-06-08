@@ -69,7 +69,9 @@ def main():
         from garmindb.data.repositories import SQLiteHealthRepository
         from garmindb.analysis.performance_targets import load_performance_targets
         from garmindb.analysis.performance_report import PerformanceReportBuilder
-        from garmindb.analysis.report_state import load_last_metrics, save_metrics
+        from garmindb.analysis.report_state import (
+            load_last_metrics, save_metrics, merge_metrics,
+        )
         from garmindb.presentation.markdown.performance_renderer import PerformancePresenter
 
         db_dir = db_params.db_path
@@ -93,7 +95,10 @@ def main():
             targets=targets, last_metrics=last,
         )
         report = builder.build(start, end, generated)
-        save_metrics(state_path, report.metric_snapshot, generated.isoformat())
+        # Merge onto the previous state so a metric absent this run carries its
+        # last-known value forward instead of destroying the baseline.
+        merged = merge_metrics(last, report.metric_snapshot)
+        save_metrics(state_path, merged, generated.isoformat())
         markdown = PerformancePresenter(
             include_metadata=not args.no_metadata
         ).render(report)
