@@ -9,12 +9,15 @@ powerTimeInZone_<n>). This analyzer reads those at report time.
 
 import glob
 import json
+import logging
 import os
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from .models import Insight, InsightSeverity
+
+logger = logging.getLogger(__name__)
 
 # Durations (seconds) shown on the power curve.
 CURVE_DURATIONS = [5, 60, 300, 1200, 3600]
@@ -53,6 +56,7 @@ class PowerAnalysisResult:
     rides_with_power: int
     total_rides: int
     ftp_needs_test: bool
+    skipped_files: int = 0                 # corrupt/unreadable JSONs ignored
     insights: List[Insight] = field(default_factory=list)
 
 
@@ -122,21 +126,35 @@ class PowerAnalyzer:
                 curve[d] = max(vals)
         return curve
 
-    def _load_rides(self) -> List["PowerRide"]:
-        """Glob the activities dir and parse all cycling rides with power."""
+    def _load_rides(self) -> Tuple[List["PowerRide"], int]:
+        """Glob the activities dir and parse all cycling rides with power.
+
+        Returns the list of parsed rides plus a count of files that could
+        not be read or decoded. Each unreadable file is logged at WARNING
+        so a silently-corrupt JSON never understates FTP/W-kg/curve without
+        a trace.
+        """
         rides: List[PowerRide] = []
+        skipped = 0
         if not os.path.isdir(self._dir):
-            return rides
+            logger.warning("Activities dir does not exist: %s", self._dir)
+            return rides, skipped
         for path in glob.glob(os.path.join(self._dir, "activity_*.json")):
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, OSError) as err:
+                skipped += 1
+                logger.warning("Skipping unreadable activity JSON %s: %s",
+                               path, err)
                 continue
             ride = self._parse_ride(data)
             if ride is not None:
                 rides.append(ride)
-        return rides
+        if skipped:
+            logger.warning("Skipped %d unreadable activity JSON file(s) in %s",
+                           skipped, self._dir)
+        return rides, skipped
 
     @staticmethod
     def _zone_distribution(rides: List["PowerRide"]) -> Dict[int, float]:
@@ -156,7 +174,7 @@ class PowerAnalyzer:
         'recent' = last RECENT_WINDOW_DAYS before end_date (current form);
         'alltime' = every ride on disk (personal bests).
         """
-        all_rides = self._load_rides()
+        all_rides, skipped_files = self._load_rides()
         recent_start = end_date - timedelta(days=self.RECENT_WINDOW_DAYS)
         recent = [r for r in all_rides if recent_start <= r.date <= end_date]
 
@@ -182,6 +200,12 @@ class PowerAnalyzer:
             rides_with_power=len(recent),
             total_rides=len(all_rides),
             ftp_needs_test=ftp_needs_test,
+            skipped_files=skipped_files,
+        )
+        logger.debug(
+            "Power analysis %s..%s: %d ride(s) total, %d recent with power, "
+            "%d file(s) skipped",
+            start_date, end_date, len(all_rides), len(recent), skipped_files,
         )
         result.insights = self._build_insights(result)
         return result

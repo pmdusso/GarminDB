@@ -43,3 +43,29 @@ def test_analyze_empty_dir(tmp_path):
     assert result.rides_with_power == 0
     assert result.best_20min_recent is None
     assert result.ftp_needs_test is False
+    assert result.skipped_files == 0
+
+
+def test_analyze_skips_corrupt_files_and_counts_them(tmp_path):
+    folder = str(tmp_path)
+    # A valid cycling ride with power.
+    _write_ride(folder, 1, "2026-05-20", maxAvgPower_1200=290,
+                powerTimeInZone_2=1400.0)
+    # A cycling ride WITHOUT power data (parsed but not counted).
+    _write_ride(folder, 2, "2026-05-21")
+    # A running activity (not cycling, not counted, not skipped).
+    with open(os.path.join(folder, "activity_3.json"), "w") as f:
+        json.dump({"activityType": {"typeKey": "running"},
+                   "startTimeLocal": "2026-05-22 10:00:00"}, f)
+    # A malformed JSON file -> must be skipped and counted, not crash.
+    with open(os.path.join(folder, "activity_4.json"), "w") as f:
+        f.write("{not json")
+
+    analyzer = PowerAnalyzer(folder, configured_ftp=325)
+    result = analyzer.analyze(date(2026, 5, 1), date(2026, 6, 7))
+
+    # Only the one valid cycling-with-power ride is counted.
+    assert result.total_rides == 1
+    assert result.rides_with_power == 1
+    # Exactly one unreadable file was skipped.
+    assert result.skipped_files == 1
