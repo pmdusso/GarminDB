@@ -32,3 +32,16 @@ def test_returns_none_when_no_data(tmp_path):
 
 def test_returns_none_when_db_missing(tmp_path):
     assert get_latest_vo2max(str(tmp_path), date(2026, 1, 1), date(2026, 6, 1)) is None
+
+
+def test_returns_none_when_schema_missing_table(tmp_path):
+    # Old-schema / corrupt DB: the file exists but has no cycle_activities table.
+    # The query must not raise; it must log a warning and return None so the
+    # rest of the report (power/recovery/sleep) survives.
+    db_dir = str(tmp_path)
+    path = os.path.join(db_dir, "garmin_activities.db")
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE activities (activity_id INTEGER, start_time TIMESTAMP)")
+    con.commit()
+    con.close()
+    assert get_latest_vo2max(db_dir, date(2026, 1, 1), date(2026, 6, 1)) is None
