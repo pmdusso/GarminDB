@@ -14,8 +14,8 @@ def _report():
                                    race_name="L'Etape Campos do Jordao", race_date="2026-09-27"),
         scorecard=[
             ScorecardRow("W/kg", "3,81", "4,0", "-0,19",
-                         MetricDelta(3.81, 3.71, 0.10)),
-            ScorecardRow("Peso", "84,5 kg", "80 kg", "4,5", MetricDelta(84.5, 85.3, -0.8)),
+                         MetricDelta(3.81, 3.71)),
+            ScorecardRow("Peso", "84,5 kg", "80 kg", "4,5", MetricDelta(84.5, 85.3)),
         ],
         readiness_light="🟡", readiness_label="recuperação parcial",
         priorities=["⚠️ Elevated RHR: RHR up", "ℹ️ Confirme FTP: teste"],
@@ -48,3 +48,41 @@ def test_render_delta_arrows():
 def test_no_metadata_flag_skips_frontmatter():
     md = PerformancePresenter(include_metadata=False).render(_report())
     assert not md.startswith("---")
+
+
+def _report_with_rows(rows):
+    return PerformanceReport(
+        generated_at=datetime(2026, 6, 8, 12, 0, 0),
+        period_start=date(2026, 5, 9), period_end=date(2026, 6, 7),
+        targets=PerformanceTargets(ftp_watts=325, weight_target_kg=80, wkg_target=4.0,
+                                   race_name="L'Etape", race_date="2026-09-27"),
+        scorecard=rows,
+        readiness_light="🟡", readiness_label="recuperação parcial",
+        priorities=[],
+        power=None, activity=None, recovery=None, sleep=None, stress=None,
+        current_weight_kg=None, wkg_current=None, ftp_used=325, vo2max=56,
+        deltas={}, metric_snapshot={},
+    )
+
+
+def test_delta_cell_no_previous_reads_baseline():
+    # current present, no previous -> first run baseline.
+    rows = [ScorecardRow("W/kg", "3,81", "4,0", "-0,19", MetricDelta(3.81, None))]
+    md = PerformancePresenter(include_metadata=False).render(_report_with_rows(rows))
+    assert "baseline" in md
+    assert "sem dado" not in md
+
+
+def test_delta_cell_absent_current_reads_sem_dado():
+    # current is "—" (no data this run) -> must read "sem dado", not "baseline".
+    rows = [ScorecardRow("VO2max", "—", "—", "—", None)]
+    md = PerformancePresenter(include_metadata=False).render(_report_with_rows(rows))
+    assert "sem dado" in md
+    assert "baseline" not in md
+
+
+def test_delta_cell_absent_current_with_stale_previous_reads_sem_dado():
+    # Even if a previous baseline exists, an absent current means no data now.
+    rows = [ScorecardRow("VO2max", "—", "—", "—", MetricDelta(56.0, 56.0))]
+    md = PerformancePresenter(include_metadata=False).render(_report_with_rows(rows))
+    assert "sem dado" in md

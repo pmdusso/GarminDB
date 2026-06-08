@@ -5,6 +5,7 @@ Aggregates power (JSON), training load / recovery / sleep / stress
 targets, and computes a scorecard, readiness light, deltas and priorities.
 """
 
+import logging
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Dict, List, Optional
@@ -17,6 +18,18 @@ from .power_analyzer import PowerAnalysisResult, PowerAnalyzer
 from .performance_targets import PerformanceTargets
 from .report_state import MetricDelta, compute_deltas
 from .db_metrics import get_latest_vo2max
+
+logger = logging.getLogger(__name__)
+
+# Canonical scorecard metric keys. Hoisted to module level so the snapshot and
+# the scorecard share a single source of truth — a rename here updates both and
+# can never silently drop a Δ column.
+METRIC_WKG = "wkg"
+METRIC_FTP = "ftp"
+METRIC_WEIGHT = "weight"
+METRIC_VO2MAX = "vo2max"
+METRIC_CTL = "ctl"
+METRIC_TSB = "tsb"
 
 # Severity ranking for prioritisation (lower = more urgent).
 _SEVERITY_RANK = {
@@ -138,13 +151,17 @@ class PerformanceReportBuilder:
     def _current_weight(self, start_date, end_date) -> Optional[float]:
         series = self._repo.get_weight_series(start_date, end_date)
         if not series:
+            logger.debug("No weigh-ins in %s..%s; current weight is None",
+                         start_date, end_date)
             return None
-        return sum(w for _, w in series) / len(series)
+        # The series is sorted ascending, so the last entry is the most recent
+        # weigh-in. "Agora" must reflect the latest value, not the window mean.
+        return series[-1][1]
 
     @staticmethod
     def _snapshot(wkg, ftp, weight, vo2max, ctl, tsb) -> Dict[str, float]:
-        raw = {"wkg": wkg, "ftp": ftp, "weight": weight,
-               "vo2max": vo2max, "ctl": ctl, "tsb": tsb}
+        raw = {METRIC_WKG: wkg, METRIC_FTP: ftp, METRIC_WEIGHT: weight,
+               METRIC_VO2MAX: vo2max, METRIC_CTL: ctl, METRIC_TSB: tsb}
         return {k: float(v) for k, v in raw.items() if v is not None}
 
     def _scorecard(self, wkg, ftp, weight, vo2max, ctl, tsb, deltas) -> List[ScorecardRow]:
@@ -160,13 +177,13 @@ class PerformanceReportBuilder:
 
         rows = [
             ScorecardRow("W/kg", fmt(wkg, 2), fmt(t.wkg_target, 1),
-                         gap(wkg, t.wkg_target), deltas.get("wkg")),
-            ScorecardRow("FTP", fmt(ftp, 0) + " W", "—", "—", deltas.get("ftp")),
+                         gap(wkg, t.wkg_target), deltas.get(METRIC_WKG)),
+            ScorecardRow("FTP", fmt(ftp, 0) + " W", "—", "—", deltas.get(METRIC_FTP)),
             ScorecardRow("Peso", fmt(weight, 1) + " kg", fmt(t.weight_target_kg, 0) + " kg",
-                         gap(weight, t.weight_target_kg), deltas.get("weight")),
-            ScorecardRow("VO2max", fmt(vo2max, 0), "—", "—", deltas.get("vo2max")),
-            ScorecardRow("Fitness (CTL)", fmt(ctl, 0), "—", "—", deltas.get("ctl")),
-            ScorecardRow("Forma (TSB)", fmt(tsb, 0), "—", "—", deltas.get("tsb")),
+                         gap(weight, t.weight_target_kg), deltas.get(METRIC_WEIGHT)),
+            ScorecardRow("VO2max", fmt(vo2max, 0), "—", "—", deltas.get(METRIC_VO2MAX)),
+            ScorecardRow("Fitness (CTL)", fmt(ctl, 0), "—", "—", deltas.get(METRIC_CTL)),
+            ScorecardRow("Forma (TSB)", fmt(tsb, 0), "—", "—", deltas.get(METRIC_TSB)),
         ]
         return rows
 

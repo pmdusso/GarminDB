@@ -1,10 +1,15 @@
 # garmindb/presentation/markdown/performance_renderer.py
 """Render a PerformanceReport to Markdown."""
 
-from typing import List, Optional
+import logging
+from typing import List
 
-from garmindb.analysis.performance_report import PerformanceReport
-from garmindb.analysis.report_state import MetricDelta
+from garmindb.analysis.performance_report import PerformanceReport, ScorecardRow
+
+logger = logging.getLogger(__name__)
+
+# Placeholder shown when a metric has no value (formatted by the builder).
+_NO_VALUE = "—"
 
 
 class PerformancePresenter:
@@ -47,11 +52,17 @@ class PerformancePresenter:
         return f"\n**PRONTIDÃO:** {r.readiness_light} {r.readiness_label}\n"
 
     @staticmethod
-    def _delta_cell(delta: Optional[MetricDelta]) -> str:
-        if delta is None or not delta.has_previous or delta.delta is None:
+    def _delta_cell(row: ScorecardRow) -> str:
+        # No value this run: the Δ is meaningless — say so explicitly instead
+        # of implying a "baseline" (which only applies on a true first run).
+        if row.current == _NO_VALUE:
+            return "sem dado"
+        delta = row.delta
+        if delta is None or not delta.has_previous:
             return "baseline"
-        arrow = "↑" if delta.delta > 0 else ("↓" if delta.delta < 0 else "→")
-        return f"{arrow} {abs(delta.delta):.2f}".replace(".", ",")
+        change = delta.delta
+        arrow = "↑" if change > 0 else ("↓" if change < 0 else "→")
+        return f"{arrow} {abs(change):.2f}".replace(".", ",")
 
     def _scorecard(self, r: PerformanceReport) -> str:
         lines = [
@@ -62,7 +73,7 @@ class PerformancePresenter:
         for row in r.scorecard:
             lines.append(
                 f"| {row.label} | {row.current} | {row.target} | "
-                f"{row.gap} | {self._delta_cell(row.delta)} |"
+                f"{row.gap} | {self._delta_cell(row)} |"
             )
         return "\n".join(lines) + "\n"
 

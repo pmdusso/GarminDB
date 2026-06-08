@@ -87,11 +87,38 @@ def _power_stub(ftp):
 
 def test_builds_wkg_and_scorecard(monkeypatch):
     report = _build(monkeypatch)
-    # current weight = mean(84, 85) = 84.5; wkg = 325 / 84.5
-    assert round(report.current_weight_kg, 1) == 84.5
-    assert round(report.wkg_current, 2) == round(325 / 84.5, 2)
+    # current weight = most recent weigh-in = 85.0 (series sorted ascending);
+    # wkg = 325 / 85.0
+    assert round(report.current_weight_kg, 1) == 85.0
+    assert round(report.wkg_current, 2) == round(325 / 85.0, 2)
     labels = [row.label for row in report.scorecard]
     assert "W/kg" in labels and "FTP" in labels and "Peso" in labels
+
+
+def test_empty_weight_series_yields_no_wkg_and_dash_cell(monkeypatch):
+    class _EmptyRepo(_StubRepo):
+        def get_weight_series(self, s, e):
+            return []
+
+    import garmindb.analysis.performance_report as mod
+    monkeypatch.setattr(mod, "_run_power", lambda d, ftp, s, e: _power_stub(ftp))
+    monkeypatch.setattr(mod, "_run_activity", lambda repo, s, e: _activity_result())
+    monkeypatch.setattr(mod, "_run_recovery", lambda repo, s, e: _recovery_result(60))
+    monkeypatch.setattr(mod, "_run_sleep", lambda repo, s, e: _sleep_result())
+    monkeypatch.setattr(mod, "_run_stress", lambda repo, s, e: _stress_result())
+    monkeypatch.setattr(mod, "get_latest_vo2max", lambda d, s, e: 56.0)
+    builder = PerformanceReportBuilder(
+        repository=_EmptyRepo(), db_dir="/tmp/db", activities_dir="/tmp/acts",
+        targets=PerformanceTargets(ftp_watts=325, weight_target_kg=80, wkg_target=4.0,
+                                   race_name="L'Etape", race_date="2026-09-27"),
+        last_metrics=None,
+    )
+    report = builder.build(date(2026, 5, 9), date(2026, 6, 7),
+                           datetime(2026, 6, 8, 12, 0, 0))
+    assert report.current_weight_kg is None
+    assert report.wkg_current is None
+    wkg_row = next(row for row in report.scorecard if row.label == "W/kg")
+    assert wkg_row.current == "—"
 
 
 def test_readiness_light_from_recovery_score(monkeypatch):
