@@ -136,7 +136,7 @@ class PerformanceReportBuilder:
         deltas = compute_deltas(snapshot, self._last)
 
         scorecard = self._scorecard(wkg, ftp_used, weight, vo2max, ctl, tsb, deltas)
-        light, label = self._readiness(recovery.recovery_score)
+        light, label = self._readiness(recovery)
         priorities = self._priorities([power, activity, recovery, sleep, stress])
 
         return PerformanceReport(
@@ -188,10 +188,17 @@ class PerformanceReportBuilder:
         return rows
 
     @staticmethod
-    def _readiness(recovery_score: int):
-        if recovery_score >= 70:
+    def _readiness(recovery: RecoveryAnalysisResult):
+        # When the recovery analyzer saw no data, recovery_score is a neutral
+        # fallback (e.g. 50) — surfacing it as a colored directive fabricates a
+        # recommendation. Emit a neutral ⚪ light instead.
+        if getattr(recovery, "days_analyzed", 0) <= 0:
+            logger.info("Recovery has no data (days_analyzed=0); readiness is neutral")
+            return "⚪", "dados insuficientes para avaliar prontidão"
+        score = recovery.recovery_score
+        if score >= 70:
             return "🟢", "pronto para construir"
-        if recovery_score >= 50:
+        if score >= 50:
             return "🟡", "recuperação parcial — module a carga"
         return "🔴", "recuperação baixa — priorize descanso"
 

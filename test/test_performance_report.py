@@ -26,7 +26,7 @@ def _activity_result():
     return r
 
 
-def _recovery_result(score):
+def _recovery_result(score, days_analyzed=14):
     return RecoveryAnalysisResult(
         period_start=date(2026, 5, 9), period_end=date(2026, 6, 7),
         recovery_score=score, recovery_trend=TrendDirection.STABLE,
@@ -35,6 +35,7 @@ def _recovery_result(score):
         training_load_summary=MetricSummary("Load", 2000.0, "TSS"),
         rhr_baseline=50.0, rhr_deviation=5.0, weekly_tss=2000.0,
         insights=[Insight("Elevated RHR", "RHR up", InsightSeverity.WARNING, "recovery")],
+        days_analyzed=days_analyzed,
     )
 
 
@@ -56,11 +57,13 @@ def _stress_result():
     )
 
 
-def _build(monkeypatch, recovery_score=60, last_metrics=None):
+def _build(monkeypatch, recovery_score=60, last_metrics=None, recovery_days=14):
     import garmindb.analysis.performance_report as mod
     monkeypatch.setattr(mod, "_run_power", lambda d, ftp, s, e: _power_stub(ftp))
     monkeypatch.setattr(mod, "_run_activity", lambda repo, s, e: _activity_result())
-    monkeypatch.setattr(mod, "_run_recovery", lambda repo, s, e: _recovery_result(recovery_score))
+    monkeypatch.setattr(
+        mod, "_run_recovery",
+        lambda repo, s, e: _recovery_result(recovery_score, recovery_days))
     monkeypatch.setattr(mod, "_run_sleep", lambda repo, s, e: _sleep_result())
     monkeypatch.setattr(mod, "_run_stress", lambda repo, s, e: _stress_result())
     monkeypatch.setattr(mod, "get_latest_vo2max", lambda d, s, e: 56.0)
@@ -125,6 +128,15 @@ def test_readiness_light_from_recovery_score(monkeypatch):
     assert _build(monkeypatch, recovery_score=80).readiness_light == "🟢"
     assert _build(monkeypatch, recovery_score=60).readiness_light == "🟡"
     assert _build(monkeypatch, recovery_score=40).readiness_light == "🔴"
+
+
+def test_readiness_no_data_is_neutral_not_fake_yellow(monkeypatch):
+    # When the recovery analyzer saw no data (days_analyzed == 0), the neutral
+    # fallback score (50) must NOT be presented as a colored directive. Readiness
+    # becomes ⚪ "dados insuficientes" instead of a fabricated 🟡.
+    report = _build(monkeypatch, recovery_score=50, recovery_days=0)
+    assert report.readiness_light == "⚪"
+    assert "insuficientes" in report.readiness_label
 
 
 def test_priorities_lead_with_severe_insights(monkeypatch):
