@@ -5,7 +5,8 @@ from garmindb.analysis.performance_report import PerformanceReport, ScorecardRow
 from garmindb.analysis.performance_targets import PerformanceTargets
 from garmindb.analysis.power_analyzer import PowerAnalysisResult
 from garmindb.analysis.report_state import MetricDelta
-from garmindb.analysis.decoupling_analyzer import DecouplingResult, RideDecoupling
+from garmindb.analysis.decoupling_analyzer import (
+    DecouplingResult, RideDecoupling, PaHrResult, PaHrRide)
 
 
 def _power(recent_ride_count, total_rides, skipped_files=0):
@@ -201,3 +202,27 @@ def test_render_decoupling_unsteady_note():
     md = PerformancePresenter(include_metadata=False).render(r)
     assert "🟢 forte" in md
     assert "variabilidade alta" in md
+
+
+def _pahr_ride(dc_pct, indoor=False, day=date(2026, 5, 20)):
+    return PaHrRide(
+        activity_id="1", date=day, moving_time_s=5400, indoor=indoor,
+        ef_first=1.43, ef_second=1.25, decoupling_pct=dc_pct, ef_overall=1.34,
+        avg_power=210.0, sample_count=4200,
+        steady=(None if indoor else True))
+
+
+def test_render_pahr_section_present_with_indoor_label():
+    r = _report()
+    r.pahr = PaHrResult(
+        period_start=date(2026, 5, 9), period_end=date(2026, 6, 7),
+        rides=[_pahr_ride(12.5, indoor=True)], eligible_count=1, analyzed_count=1)
+    md = PerformancePresenter(include_metadata=False).render(r)
+    assert "potência:FC" in md
+    assert "indoor" in md and "210 W" in md
+    assert "12.5%" in md and "🔴 alto" in md
+
+
+def test_render_pahr_absent_emits_nothing():
+    md = PerformancePresenter(include_metadata=False).render(_report())
+    assert "potência:FC" not in md
