@@ -106,8 +106,12 @@ class PerformancePresenter:
             reason = power.gate.reason if power.gate else "sem esforço qualificado"
             lines.append(f"- **eFTP medido:** não publicado — {reason}.")
         if power.peak_5s:
+            dropped = getattr(power, "peak_5s_dropped", 0) or 0
+            extra = (f" {dropped} leitura(s) de 5 s descartada(s) como ruído."
+                     if dropped else "")
             lines.append(f"- **Pico neuromuscular (5 s):** {w(power.peak_5s)} W "
-                         "(maxAvgPower_5; nunca o pico de 1 s, que é ruído).")
+                         "(maxAvgPower_5; nunca o pico de 1 s, que é ruído)."
+                         + extra)
         if power.np_variability_ratio:
             lines.append(
                 f"- **Variabilidade (NP/méd, ≥30 min):** "
@@ -144,7 +148,7 @@ class PerformancePresenter:
 
         line = (
             f"_Cobertura de potência: {power.total_rides} pedais com potência "
-            f"no histórico; {power.rides_with_power} nos últimos 90 dias "
+            f"no histórico; {power.recent_ride_count} nos últimos 90 dias "
             "(forma atual)"
         )
         skipped = getattr(power, "skipped_files", 0) or 0
@@ -157,7 +161,7 @@ class PerformancePresenter:
         line += "._"
 
         parts = ["\n" + line]
-        if power.rides_with_power == 0 and power.total_rides > 0:
+        if power.recent_ride_count == 0 and power.total_rides > 0:
             logger.warning(
                 "Power coverage: 0 of %d rides had power; meter likely "
                 "was not recording.", power.total_rides,
