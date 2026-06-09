@@ -10,8 +10,13 @@ import os
 import sqlite3
 from datetime import date, datetime, timedelta
 
+from types import SimpleNamespace
+
 from garmindb.analysis.decoupling_analyzer import (
-    DecouplingAnalyzer, DecouplingResult, _ef,
+    DecouplingAnalyzer, DecouplingResult, RideDecoupling, _ef,
+)
+from garmindb.presentation.markdown.longitudinal_renderer import (
+    LongitudinalPresenter,
 )
 
 
@@ -143,3 +148,34 @@ def test_empty_db_is_safe(tmp_path):
     r = DecouplingAnalyzer(str(tmp_path)).analyze(date(2026, 1, 1),
                                                   date(2026, 6, 7))
     assert r.eligible_count == 0 and r.rides == [] and r.insights == []
+
+
+# --------------------------------------------------------------------------- #
+# Longitudinal (--anamnesis) rendering of the decoupling block
+# --------------------------------------------------------------------------- #
+
+def _result_with_ride(dc_pct, **kw):
+    ride = RideDecoupling(
+        activity_id="1", date=date(2026, 5, 20), moving_time_s=5400,
+        distance_km=45.0, ef_first=0.214, ef_second=0.198, decoupling_pct=dc_pct,
+        ef_overall=0.206, speed_cv=0.12, sample_count=4200, steady=True)
+    return DecouplingResult(
+        period_start=date(2026, 1, 1), period_end=date(2026, 6, 7),
+        rides=[ride], monthly_decoupling=[("2026-05", dc_pct)],
+        monthly_ef=[("2026-05", 0.206)], **kw)
+
+
+def test_longitudinal_presenter_renders_decoupling():
+    res = _result_with_ride(7.5, eligible_count=2, analyzed_count=1,
+                            skipped_unsteady=1)
+    md = LongitudinalPresenter(include_metadata=False)._decoupling(
+        SimpleNamespace(decoupling=res))
+    assert "FC:velocidade" in md
+    assert "7.5%" in md and "2026-05" in md
+    assert "variabilidade alta" in md
+
+
+def test_longitudinal_presenter_decoupling_absent_is_empty():
+    md = LongitudinalPresenter(include_metadata=False)._decoupling(
+        SimpleNamespace(decoupling=None))
+    assert md == ""
