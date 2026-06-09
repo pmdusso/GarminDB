@@ -25,6 +25,7 @@ class PerformancePresenter:
         parts.append(self._readiness(report))
         parts.append(self._scorecard(report))
         parts.append(self.render_power_block(report.power, report.wkg_measured))
+        parts.append(self._decoupling(report))
         parts.append(self._coverage(report))
         parts.append(self._priorities(report))
         return "\n".join(p for p in parts if p).rstrip() + "\n"
@@ -51,6 +52,47 @@ class PerformancePresenter:
 
     def _readiness(self, r: PerformanceReport) -> str:
         return f"\n**PRONTIDÃO:** {r.readiness_light} {r.readiness_label}\n"
+
+    @staticmethod
+    def _hms(seconds) -> str:
+        s = int(seconds or 0)
+        return f"{s // 3600}:{(s % 3600) // 60:02d}"
+
+    @staticmethod
+    def _dc_label(pct: float) -> str:
+        if pct < 5.0:
+            return "🟢 forte"
+        if pct <= 10.0:
+            return "🟡 moderado"
+        return "🔴 alto"
+
+    def _decoupling(self, r: PerformanceReport) -> str:
+        d = getattr(r, "decoupling", None)
+        if d is None or d.eligible_count == 0:
+            return ""
+        lines = ["\n## 🫀 Durabilidade aeróbica (FC:velocidade)\n",
+                 "EF = velocidade/FC; desacoplamento = (EF 1ª metade − EF 2ª "
+                 "metade) / EF 1ª metade. <5% forte · 5–10% moderado · >10% "
+                 "acima do limiar aeróbico.\n"]
+        rides = d.rides[:5]
+        if rides:
+            lines.append("| Data | Duração | EF | Desacopl. | |")
+            lines.append("|---|---|---|---|---|")
+            for ride in rides:
+                lines.append(
+                    f"| {ride.date} | {self._hms(ride.moving_time_s)} | "
+                    f"{ride.ef_overall:.3f} | {ride.decoupling_pct:.1f}% | "
+                    f"{self._dc_label(ride.decoupling_pct)} |")
+        else:
+            lines.append("_Sem pedaladas estáveis suficientes no período._")
+        if d.skipped_unsteady:
+            lines.append(f"\n_{d.skipped_unsteady} pedalada(s) elegível(is) "
+                         "descartada(s) por variabilidade alta (esforço não "
+                         "estável)._")
+        lines.append("\n_Apenas pedaladas outdoor ≥60 min (velocidade indoor é "
+                     "simulada); aquecimento e paradas removidos. Métrica válida "
+                     "para esforço estável sub-limiar._")
+        return "\n".join(lines)
 
     @staticmethod
     def _delta_cell(row: ScorecardRow) -> str:
