@@ -354,7 +354,40 @@ class LongitudinalPresenter:
                      "(o Garmin emite uma estimativa por atividade); '—' = sem leitura "
                      "no mês. As demais séries do relatório usam médias mensais._")
         lines.append(self._power_caveat(r))
+        lines.append(self._decoupling(r))
         return "\n".join(lines) + "\n"
+
+    def _decoupling(self, r: LongitudinalReport) -> str:
+        d = getattr(r, "decoupling", None)
+        if d is None or getattr(d, "eligible_count", 0) == 0:
+            return ""
+        body = ["\n### Durabilidade aeróbica (desacoplamento FC:velocidade)\n",
+                "EF = velocidade/FC; desacoplamento = (EF 1ª metade − 2ª metade)/"
+                "EF 1ª metade, só em pedaladas outdoor ≥60 min estáveis "
+                "(velocidade indoor é simulada). <5% forte · 5–10% moderado · "
+                ">10% acima do limiar aeróbico.\n"]
+        months = [(ym, dc) for ym, dc in d.monthly_decoupling if dc is not None]
+        ef_by = dict(d.monthly_ef)
+        if months:
+            body.append("| Mês | Desacopl. médio | EF médio |")
+            body.append("|---|---|---|")
+            for ym, dc in months:
+                ef = ef_by.get(ym)
+                body.append(f"| {ym} | {dc:.1f}% | "
+                            f"{_num(ef, 3) if ef is not None else '—'} |")
+        rides = d.rides[:3]
+        if rides:
+            body.append("\n**Pedaladas recentes:**\n")
+            for ride in rides:
+                body.append(f"- {ride.date}: desacoplamento "
+                            f"{ride.decoupling_pct:.1f}% · EF {ride.ef_overall:.3f}")
+        if d.skipped_unsteady:
+            body.append(f"\n_{d.skipped_unsteady} pedalada(s) elegível(is) "
+                        "descartada(s) por variabilidade alta._")
+        body.append(f"\n_{d.analyzed_count} pedalada(s) analisada(s); métrica "
+                    "válida para esforço estável sub-limiar; aquecimento e "
+                    "paradas removidos._")
+        return "\n".join(body)
 
     def _power_caveat(self, r: LongitudinalReport) -> str:
         t = r.targets

@@ -15,6 +15,7 @@ from .models import (
     StressAnalysisResult, Insight, InsightSeverity,
 )
 from .power_analyzer import PowerAnalysisResult, PowerAnalyzer
+from .decoupling_analyzer import DecouplingResult
 from .performance_targets import PerformanceTargets
 from .report_state import MetricDelta, compute_deltas
 from .db_metrics import get_latest_vo2max
@@ -63,6 +64,11 @@ def _run_sleep(repository, start, end) -> SleepAnalysisResult:
 def _run_stress(repository, start, end) -> StressAnalysisResult:
     from .stress_analyzer import StressAnalyzer
     return StressAnalyzer(repository).analyze(start, end)
+
+
+def _run_decoupling(db_dir, start, end) -> DecouplingResult:
+    from .decoupling_analyzer import DecouplingAnalyzer
+    return DecouplingAnalyzer(db_dir).analyze(start, end)
 
 
 def _weight_near(repository, target: date, window_days: int = 7):
@@ -125,6 +131,7 @@ class PerformanceReport:
     metric_snapshot: Dict[str, float] = field(default_factory=dict)
     eftp_measured: Optional[float] = None
     wkg_measured: Optional[float] = None
+    decoupling: Optional[DecouplingResult] = None
 
 
 class PerformanceReportBuilder:
@@ -165,7 +172,9 @@ class PerformanceReportBuilder:
 
         scorecard = self._scorecard(wkg, ftp_used, weight, vo2max, ctl, tsb, deltas)
         light, label = self._readiness(recovery)
-        priorities = self._priorities([power, activity, recovery, sleep, stress])
+        decoupling = _run_decoupling(self._db_dir, start_date, end_date)
+        priorities = self._priorities(
+            [power, activity, recovery, sleep, stress, decoupling])
 
         return PerformanceReport(
             generated_at=generated_at, period_start=start_date, period_end=end_date,
@@ -175,6 +184,7 @@ class PerformanceReportBuilder:
             current_weight_kg=weight, wkg_current=wkg, ftp_used=ftp_used,
             vo2max=vo2max, deltas=deltas, metric_snapshot=snapshot,
             eftp_measured=power.eftp_measured, wkg_measured=wkg_measured,
+            decoupling=decoupling,
         )
 
     def _current_weight(self, start_date, end_date) -> Optional[float]:

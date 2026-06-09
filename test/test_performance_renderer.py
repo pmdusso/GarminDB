@@ -5,6 +5,7 @@ from garmindb.analysis.performance_report import PerformanceReport, ScorecardRow
 from garmindb.analysis.performance_targets import PerformanceTargets
 from garmindb.analysis.power_analyzer import PowerAnalysisResult
 from garmindb.analysis.report_state import MetricDelta
+from garmindb.analysis.decoupling_analyzer import DecouplingResult, RideDecoupling
 
 
 def _power(recent_ride_count, total_rides, skipped_files=0):
@@ -167,3 +168,36 @@ def test_render_priority_severity_emoji_prefixes():
     assert "1. 🚨 Overtraining risk" in md
     assert "2. ⚠️ Elevated RHR" in md
     assert "3. ⚠️ Poor sleep" in md
+
+
+def _ride(dc_pct, day=date(2026, 5, 20)):
+    return RideDecoupling(
+        activity_id="1", date=day, moving_time_s=5400, distance_km=45.0,
+        ef_first=0.214, ef_second=0.198, decoupling_pct=dc_pct, ef_overall=0.206,
+        speed_cv=0.12, sample_count=4200, steady=True)
+
+
+def test_render_decoupling_section_present():
+    r = _report()
+    r.decoupling = DecouplingResult(
+        period_start=date(2026, 5, 9), period_end=date(2026, 6, 7),
+        rides=[_ride(12.5)], eligible_count=1, analyzed_count=1)
+    md = PerformancePresenter(include_metadata=False).render(r)
+    assert "Durabilidade aeróbica" in md
+    assert "12.5%" in md and "🔴 alto" in md
+    assert "indoor é" in md  # honesty caveat present
+
+
+def test_render_decoupling_absent_emits_nothing():
+    md = PerformancePresenter(include_metadata=False).render(_report())
+    assert "Durabilidade aeróbica" not in md
+
+
+def test_render_decoupling_unsteady_note():
+    r = _report()
+    r.decoupling = DecouplingResult(
+        period_start=date(2026, 5, 9), period_end=date(2026, 6, 7),
+        rides=[_ride(4.2)], eligible_count=3, analyzed_count=1, skipped_unsteady=2)
+    md = PerformancePresenter(include_metadata=False).render(r)
+    assert "🟢 forte" in md
+    assert "variabilidade alta" in md
