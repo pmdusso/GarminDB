@@ -330,3 +330,40 @@ def test_operational_max_hr_empty_when_no_activities(tmp_path):
     assert report.operational_max_hr == {"cycling": None, "running": None}
     md = LongitudinalPresenter().render(report)
     assert "FC máx operacional" not in md
+
+
+# --------------------------------------------------------------------------- #
+# End-to-end: every Phase 0 metric populated at once
+# --------------------------------------------------------------------------- #
+
+def test_phase0_full_render_smoke(tmp_path):
+    daily = _spread_daily(
+        date(2025, 1, 1), 6,
+        lambda ym: {"rhr": 50, "stress_avg": 28, "bb_max": 88,
+                    "bb_min": 22, "bb_charged": 58, "spo2_avg": 96.0,
+                    "rr_waking_avg": 14.0})
+    sleep = {d: {"total": "07:30:00", "deep": "01:20:00", "light": "04:10:00",
+                 "rem": "02:00:00", "awake": "00:15:00", "avg_stress": 17.0,
+                 "score": 81} for d in daily}
+    hrv = _hrv_rows(date(2025, 1, 1), 6, weekly_fn=lambda ym: 66.0,
+                    status_fn=lambda ym: 4)
+    _write_garmin_db(
+        str(tmp_path), daily=daily, sleep=sleep,
+        attrs={"name": "Test Athlete", "year_of_birth": 1988,
+               "gender": "Gender.male", "height": 1.91, "time_zone": "UTC"},
+        weight={"2025-06-10": 85.0})
+    _write_activities_db(str(tmp_path), [
+        {"id": 1, "day": "2025-03-05", "sport": "cycling", "km": 50.0,
+         "moving": "02:00:00", "load": 120, "te": 3.0, "anaerobic_te": 2.5,
+         "max_hr": 168, "cyc_vo2": 55},
+    ])
+    _write_monitoring_db(str(tmp_path), hrv)
+    report = _builder(tmp_path, date(2025, 1, 1), date(2025, 6, 30)).build()
+    md = LongitudinalPresenter().render(report)
+    # All six harvested families are present and labelled.
+    for needle in ("SpO2", "Respiratório", "FR repouso", "anaeróbico",
+                   "média semanal", "Status VFC", "recarga noturna",
+                   "Arquitetura do sono", "FC máx operacional"):
+        assert needle in md, f"missing: {needle}"
+    # Data-honesty: still no power data, FTP still a configured goal.
+    assert "Não há dados de potência" in md
