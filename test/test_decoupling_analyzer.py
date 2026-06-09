@@ -275,3 +275,22 @@ def test_longitudinal_presenter_pahr_absent_is_empty():
     md = LongitudinalPresenter(include_metadata=False)._pahr(
         SimpleNamespace(pahr=None))
     assert md == ""
+
+
+def test_pahr_short_circuits_when_no_power_column(tmp_path):
+    # Pre-SP1-rebuild DB: activity_records lacks a power column -> Pa:Hr returns
+    # empty cleanly (no per-ride query flood, no crash).
+    import sqlite3
+    con = sqlite3.connect(os.path.join(str(tmp_path), "garmin_activities.db"))
+    con.execute("CREATE TABLE activities (activity_id TEXT, start_time TEXT, "
+                "sport TEXT, sub_sport TEXT, moving_time TEXT, distance FLOAT)")
+    con.execute("CREATE TABLE activity_records (activity_id TEXT, record INTEGER, "
+                "timestamp TEXT, hr INTEGER, speed FLOAT, position_lat FLOAT)")
+    con.execute("INSERT INTO activities VALUES (?,?,?,?,?,?)",
+                ("1", "2026-05-20 09:00:00", "cycling", "generic",
+                 "01:10:00.000000", 35.0))
+    con.commit()
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze_pahr(date(2026, 1, 1),
+                                                       date(2026, 6, 7))
+    assert r.eligible_count == 0 and r.rides == [] and r.insights == []

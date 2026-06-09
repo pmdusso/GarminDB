@@ -330,6 +330,12 @@ class DecouplingAnalyzer:
             avg_power=round(avg_power, 1), sample_count=len(samples), steady=steady,
         )
 
+    def _has_power_column(self) -> bool:
+        """True if activity_records carries the SP1 power column (post-rebuild)."""
+        cols = self._query("garmin_activities.db",
+                           "PRAGMA table_info(activity_records)")
+        return any(c[1] == "power" for c in cols)
+
     def analyze_pahr(self, start_date: date, end_date: date) -> "PaHrResult":
         """Build a PaHrResult (power:HR decoupling) for cycling rides in period.
 
@@ -337,6 +343,11 @@ class DecouplingAnalyzer:
         each ride is labelled indoor/outdoor. Outdoor rides pass the speed-CV
         steadiness gate; indoor rides are reported ungated (steady=None).
         """
+        if not self._has_power_column():
+            logger.info("activity_records has no power column yet (pre-SP1 "
+                        "rebuild); Pa:Hr is empty until garmindb_cli.py "
+                        "--rebuild_db is run.")
+            return PaHrResult(period_start=start_date, period_end=end_date)
         rows = self._query(
             "garmin_activities.db",
             "SELECT activity_id, start_time, moving_time, sub_sport "
