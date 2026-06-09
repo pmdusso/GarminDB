@@ -382,8 +382,8 @@ class LongitudinalPresenter:
             reason = (power.gate.reason if power and getattr(power, "gate", None)
                       else "dados de potência indisponíveis")
             body.append(
-                "> ⚠️ Sem eFTP **medido** publicável neste período "
-                f"({reason}). O número abaixo é **meta configurada**, não medição.")
+                "> ⚠️ Sem eFTP **medido** publicável neste período — "
+                f"{reason}. O número abaixo é **meta configurada**, não medição.")
         if t.ftp_watts:
             body.append(f"- FTP configurado: **{_num(t.ftp_watts, 0)} W** "
                         "(autorrelato / teste externo)")

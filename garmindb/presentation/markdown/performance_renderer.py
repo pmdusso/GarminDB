@@ -143,9 +143,9 @@ class PerformancePresenter:
             return ""
 
         line = (
-            f"_Cobertura: {power.rides_with_power} de {power.total_rides} "
-            f"pedais com potência (janela {power.period_start}–"
-            f"{power.period_end})"
+            f"_Cobertura de potência: {power.total_rides} pedais com potência "
+            f"no histórico; {power.rides_with_power} nos últimos 90 dias "
+            "(forma atual)"
         )
         skipped = getattr(power, "skipped_files", 0) or 0
         if skipped > 0:

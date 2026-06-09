@@ -110,9 +110,9 @@ def test_render_coverage_line():
     # A report on a partial sample must disclose its coverage.
     md = PerformancePresenter().render(_report_with_power(_power(2, 40)))
     assert "Cobertura" in md
-    assert "2 de 40" in md
-    # The analysed window should appear in the coverage line.
-    assert "2026-05-09" in md and "2026-06-07" in md
+    # New wording: total all-time rides vs recent 90-day count, no misleading fraction.
+    assert "40 pedais com potência no histórico" in md
+    assert "2 nos últimos 90 dias" in md
 
 
 def test_render_coverage_includes_skipped_files():
@@ -130,7 +130,9 @@ def test_render_zero_power_warning():
     # Rides exist but none has power -> warn the meter likely was not recording.
     md = PerformancePresenter().render(_report_with_power(_power(0, 40)))
     assert "Cobertura" in md
-    assert "0 de 40" in md
+    # New wording: 40 all-time, 0 in the last 90 days.
+    assert "40 pedais com potência no histórico" in md
+    assert "0 nos últimos 90 dias" in md
     # An explicit warning about the power meter not recording.
     assert "medidor de potência" in md.lower() or "power meter" in md.lower()
 
