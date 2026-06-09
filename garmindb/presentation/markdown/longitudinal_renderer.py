@@ -168,7 +168,7 @@ class LongitudinalPresenter:
         order = [
             ("rhr", 0), ("hrv", 0), ("vo2max_cycling", 0), ("vo2max_running", 0),
             ("ctl", 0), ("weight", 1), ("sleep", 1), ("sleep_score", 0),
-            ("stress", 0), ("body_battery", 0), ("spo2", 1),
+            ("stress", 0), ("body_battery", 0), ("spo2", 1), ("respiracao", 1),
         ]
         for key, dec in order:
             s = r.series.get(key)
@@ -286,8 +286,12 @@ class LongitudinalPresenter:
         existing 1-8 sections. Renders nothing when both series are empty."""
         spo2 = r.series.get("spo2")
         rr = r.series.get("respiracao")
-        present = [s for s in (spo2, rr) if s and s.values]
-        if not present:
+        cols = []
+        if spo2 and spo2.values:
+            cols.append(("SpO2 (%)", spo2, 1))
+        if rr and rr.values:
+            cols.append(("FR repouso (rpm)", rr, 1))
+        if not cols:
             return ""
         lines = ["\n## 2b. Respiratório / aclimatação a altitude\n"]
         lines.append(
@@ -295,16 +299,11 @@ class LongitudinalPresenter:
             "repouso ajudam a triar tolerância a altitude e carga "
             "respiratória/estresse. Estimativas ópticas de pulso — triagem, "
             "não oximetria clínica.\n")
-        for s in present:
+        for _, s, _ in cols:
             lines.append(self._metric_summary_line(s))
         lines.append("")
-        cols = []
-        if spo2 and spo2.values:
-            cols.append(("SpO2 (%)", spo2, 1))
-        if rr and rr.values:
-            cols.append(("FR repouso (rpm)", rr, 1))
         lines.append(self._months_table(r, cols))
-        for s in present:
+        for _, s, _ in cols:
             if s.note:
                 lines.append(f"\n_{s.note}._")
         return "\n".join(lines) + "\n"

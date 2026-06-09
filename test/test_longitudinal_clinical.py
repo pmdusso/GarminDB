@@ -171,3 +171,25 @@ def test_respiratory_section_absent_when_no_spo2_or_rr(tmp_path):
     report = _builder(tmp_path, date(2025, 1, 1), date(2025, 2, 28)).build()
     md = LongitudinalPresenter().render(report)
     assert "Respiratório" not in md
+
+
+# --------------------------------------------------------------------------- #
+# Respiration
+# --------------------------------------------------------------------------- #
+
+def test_respiration_series_and_renders_with_spo2(tmp_path):
+    daily = _spread_daily(
+        date(2025, 1, 1), 4,
+        lambda ym: {"spo2_avg": 96.0,
+                    "rr_waking_avg": 13.0 if ym < "2025-03" else 16.0})
+    _write_garmin_db(str(tmp_path), daily=daily)
+    _write_activities_db(str(tmp_path), [])
+    _write_monitoring_db(str(tmp_path), {})
+    report = _builder(tmp_path, date(2025, 1, 1), date(2025, 4, 30)).build()
+    rr = report.series["respiracao"]
+    assert rr.points[0] == ("2025-01", 13.0)
+    assert rr.current == 16.0
+    assert rr.better == "down"          # rising resting RR is unfavourable
+    assert rr.note is not None and "dias medidos" in rr.note
+    md = LongitudinalPresenter().render(report)
+    assert "FR repouso (rpm)" in md

@@ -309,6 +309,13 @@ class LongitudinalReportBuilder:
             coverage_note=("relevante para aclimatação a altitude "
                            "(prova de montanha); estimativa óptica de pulso"),
         )
+        series["respiracao"] = self._daily_series(
+            "garmin.db", "daily_summary", "rr_waking_avg", "day",
+            key="respiracao", label="Freq. respiratória (repouso)", unit="rpm",
+            better="down", decimals=1,
+            coverage_note=("FR de repouso elevada acompanha "
+                           "estresse/doença/overreaching"),
+        )
         series["vo2max_cycling"] = self._vo2max_series("cycle_activities")
         series["vo2max_running"] = self._vo2max_series("steps_activities")
         series["ctl"] = self._ctl_series(load_months)
