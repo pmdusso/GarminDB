@@ -53,6 +53,12 @@ def main():
         action="store_true",
         help="Generate the performance report (power/W-kg/TSB/recovery)",
     )
+    parser.add_argument(
+        "--anamnesis",
+        action="store_true",
+        help="Generate the longitudinal anamnesis report (2025-2026 trends, "
+             "totals, red-flag screen) for a sports-medicine review",
+    )
 
     args = parser.parse_args()
 
@@ -62,7 +68,31 @@ def main():
     gc_config = GarminConnectConfigManager()
     db_params = gc_config.get_db_params()
 
-    if args.performance:
+    if args.anamnesis:
+        from datetime import datetime as _dt
+        from garmindb.analysis.performance_targets import load_performance_targets
+        from garmindb.analysis.longitudinal_report import LongitudinalReportBuilder
+        from garmindb.presentation.markdown.longitudinal_renderer import (
+            LongitudinalPresenter,
+        )
+
+        db_dir = db_params.db_path
+        end = args.end or date.today()
+        # Default span: all of the prior calendar year through today, so the
+        # report always spans at least one full year plus the current YTD.
+        start = args.start or date(end.year - 1, 1, 1)
+        generated = _dt(end.year, end.month, end.day, 12, 0, 0)
+
+        targets = load_performance_targets()
+        builder = LongitudinalReportBuilder(
+            db_dir=db_dir, targets=targets,
+            start_date=start, end_date=end, generated_at=generated,
+        )
+        report = builder.build()
+        markdown = LongitudinalPresenter(
+            include_metadata=not args.no_metadata
+        ).render(report)
+    elif args.performance:
         import os
         from datetime import datetime as _dt
         from datetime import timedelta as _td
