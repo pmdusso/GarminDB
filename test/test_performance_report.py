@@ -84,7 +84,7 @@ def _power_stub(ftp):
         configured_ftp=ftp, estimated_ftp=267, best_20min_recent=281,
         best_20min_alltime=319, power_curve_recent={1200: 281},
         power_curve_alltime={1200: 319}, power_zone_distribution={2: 100.0},
-        rides_with_power=12, total_rides=12, ftp_needs_test=True, insights=[],
+        recent_ride_count=12, total_rides=12, ftp_needs_test=True, insights=[],
     )
 
 

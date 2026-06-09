@@ -94,7 +94,7 @@ class PowerAnalysisResult:
     power_curve_recent: Dict[int, float]
     power_curve_alltime: Dict[int, float]
     power_zone_distribution: Dict[int, float]  # zone -> percent of time
-    rides_with_power: int
+    recent_ride_count: int                 # rides with power in the last 90 days
     total_rides: int
     ftp_needs_test: bool
     skipped_files: int = 0                 # corrupt/unreadable JSONs ignored
@@ -368,7 +368,7 @@ class PowerAnalyzer:
             power_curve_recent=curve_recent,
             power_curve_alltime=curve_all,
             power_zone_distribution=self._zone_distribution(recent),
-            rides_with_power=len(recent),
+            recent_ride_count=len(recent),
             total_rides=len(all_rides),
             ftp_needs_test=ftp_needs_test,
             skipped_files=skipped_files,

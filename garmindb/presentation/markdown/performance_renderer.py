@@ -148,7 +148,7 @@ class PerformancePresenter:
 
         line = (
             f"_Cobertura de potência: {power.total_rides} pedais com potência "
-            f"no histórico; {power.rides_with_power} nos últimos 90 dias "
+            f"no histórico; {power.recent_ride_count} nos últimos 90 dias "
             "(forma atual)"
         )
         skipped = getattr(power, "skipped_files", 0) or 0
@@ -161,7 +161,7 @@ class PerformancePresenter:
         line += "._"
 
         parts = ["\n" + line]
-        if power.rides_with_power == 0 and power.total_rides > 0:
+        if power.recent_ride_count == 0 and power.total_rides > 0:
             logger.warning(
                 "Power coverage: 0 of %d rides had power; meter likely "
                 "was not recording.", power.total_rides,

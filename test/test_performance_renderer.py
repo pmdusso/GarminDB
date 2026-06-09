@@ -7,12 +7,12 @@ from garmindb.analysis.power_analyzer import PowerAnalysisResult
 from garmindb.analysis.report_state import MetricDelta
 
 
-def _power(rides_with_power, total_rides, skipped_files=0):
+def _power(recent_ride_count, total_rides, skipped_files=0):
     return PowerAnalysisResult(
         period_start=date(2026, 5, 9), period_end=date(2026, 6, 7),
         configured_ftp=325, estimated_ftp=290, best_20min_recent=305,
         best_20min_alltime=305, power_curve_recent={}, power_curve_alltime={},
-        power_zone_distribution={}, rides_with_power=rides_with_power,
+        power_zone_distribution={}, recent_ride_count=recent_ride_count,
         total_rides=total_rides, ftp_needs_test=False,
         skipped_files=skipped_files,
     )

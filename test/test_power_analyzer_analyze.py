@@ -25,7 +25,7 @@ def test_analyze_builds_result(tmp_path):
     analyzer = PowerAnalyzer(folder, configured_ftp=325)
     result = analyzer.analyze(date(2026, 5, 1), date(2026, 6, 7))
 
-    assert result.rides_with_power == 2
+    assert result.recent_ride_count == 2
     assert result.best_20min_recent == 305
     assert result.estimated_ftp == round(305 * 0.95)
     assert result.configured_ftp == 325
@@ -40,7 +40,7 @@ def test_analyze_builds_result(tmp_path):
 def test_analyze_empty_dir(tmp_path):
     analyzer = PowerAnalyzer(str(tmp_path), configured_ftp=325)
     result = analyzer.analyze(date(2026, 5, 1), date(2026, 6, 7))
-    assert result.rides_with_power == 0
+    assert result.recent_ride_count == 0
     assert result.best_20min_recent is None
     assert result.ftp_needs_test is False
     assert result.skipped_files == 0
@@ -66,7 +66,7 @@ def test_analyze_skips_corrupt_files_and_counts_them(tmp_path):
 
     # Only the one valid cycling-with-power ride is counted.
     assert result.total_rides == 1
-    assert result.rides_with_power == 1
+    assert result.recent_ride_count == 1
     # Exactly one unreadable file was skipped.
     assert result.skipped_files == 1
 

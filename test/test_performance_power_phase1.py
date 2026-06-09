@@ -19,7 +19,7 @@ def _power_with_eftp():
         configured_ftp=325, estimated_ftp=289, best_20min_recent=305,
         best_20min_alltime=305, power_curve_recent={1200: 305},
         power_curve_alltime={5: 820, 1200: 305}, power_zone_distribution={2: 60.0, 4: 40.0},
-        rides_with_power=3, total_rides=3, ftp_needs_test=False,
+        recent_ride_count=3, total_rides=3, ftp_needs_test=False,
         curve_outdoor={5: 820, 1200: 305}, curve_indoor={1200: 260},
         eftp_outdoor=290, eftp_indoor=247, peak_5s=820,
         gate=gate, eftp_measured=290, eftp_source="outdoor",
