@@ -355,7 +355,42 @@ class LongitudinalPresenter:
                      "no mês. As demais séries do relatório usam médias mensais._")
         lines.append(self._power_caveat(r))
         lines.append(self._decoupling(r))
+        lines.append(self._pahr(r))
         return "\n".join(lines) + "\n"
+
+    def _pahr(self, r: LongitudinalReport) -> str:
+        d = getattr(r, "pahr", None)
+        if d is None or getattr(d, "eligible_count", 0) == 0:
+            return ""
+        body = ["\n### Durabilidade aeróbica (desacoplamento potência:FC)\n",
+                "EF = potência/FC; desacoplamento = (EF 1ª metade − 2ª metade)/"
+                "EF 1ª metade, em pedaladas ≥60 min com potência (indoor e "
+                "outdoor — potência é medida). <5% forte · 5–10% moderado · "
+                ">10% acima do limiar aeróbico.\n"]
+        months = [(ym, dc) for ym, dc in d.monthly_decoupling if dc is not None]
+        ef_by = dict(d.monthly_ef)
+        if months:
+            body.append("| Mês | Desacopl. médio | EF médio (W/bpm) |")
+            body.append("|---|---|---|")
+            for ym, dc in months:
+                ef = ef_by.get(ym)
+                body.append(f"| {ym} | {dc:.1f}% | "
+                            f"{_num(ef, 3) if ef is not None else '—'} |")
+        rides = d.rides[:3]
+        if rides:
+            body.append("\n**Pedaladas recentes:**\n")
+            for ride in rides:
+                loc = "indoor" if ride.indoor else "outdoor"
+                body.append(f"- {ride.date} ({loc}): desacoplamento "
+                            f"{ride.decoupling_pct:.1f}% · {ride.avg_power:.0f} W "
+                            f"· EF {ride.ef_overall:.3f}")
+        if d.skipped_unsteady:
+            body.append(f"\n_{d.skipped_unsteady} pedalada(s) outdoor "
+                        "descartada(s) por variabilidade alta._")
+        body.append(f"\n_{d.analyzed_count} pedalada(s) com potência; rides "
+                    "indoor entram sem porta de estabilidade; aquecimento "
+                    "removido._")
+        return "\n".join(body)
 
     def _decoupling(self, r: LongitudinalReport) -> str:
         d = getattr(r, "decoupling", None)

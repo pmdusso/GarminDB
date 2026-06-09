@@ -247,3 +247,31 @@ def test_pahr_keeps_zero_power_coasting(tmp_path):
     assert r.eligible_count == 1
     # avg ~100 W proves coasting zeros were retained, not dropped.
     assert 80 < r.rides[0].avg_power < 120
+
+
+def _pahr_result(dc_pct, indoor=False, **kw):
+    from garmindb.analysis.decoupling_analyzer import PaHrRide
+    ride = PaHrRide(
+        activity_id="1", date=date(2026, 5, 20), moving_time_s=5400,
+        indoor=indoor, ef_first=1.43, ef_second=1.25, decoupling_pct=dc_pct,
+        ef_overall=1.34, avg_power=210.0, sample_count=4200,
+        steady=(None if indoor else True))
+    return PaHrResult(
+        period_start=date(2026, 1, 1), period_end=date(2026, 6, 7),
+        rides=[ride], monthly_decoupling=[("2026-05", dc_pct)],
+        monthly_ef=[("2026-05", 1.34)], **kw)
+
+
+def test_longitudinal_presenter_renders_pahr_with_indoor():
+    res = _pahr_result(7.5, indoor=True, eligible_count=1, analyzed_count=1)
+    md = LongitudinalPresenter(include_metadata=False)._pahr(
+        SimpleNamespace(pahr=res))
+    assert "potência:FC" in md
+    assert "7.5%" in md and "2026-05" in md and "indoor" in md
+    assert "210 W" in md
+
+
+def test_longitudinal_presenter_pahr_absent_is_empty():
+    md = LongitudinalPresenter(include_metadata=False)._pahr(
+        SimpleNamespace(pahr=None))
+    assert md == ""
