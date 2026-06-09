@@ -75,6 +75,7 @@ class LongitudinalPresenter:
         parts.append(self._legend(report))
         parts.append(self._profile(report))
         parts.append(self._cardiovascular(report))
+        parts.append(self._respiratory(report))
         parts.append(self._aerobic(report))
         parts.append(self._load(report))
         parts.append(self._recovery(report))
@@ -167,7 +168,7 @@ class LongitudinalPresenter:
         order = [
             ("rhr", 0), ("hrv", 0), ("vo2max_cycling", 0), ("vo2max_running", 0),
             ("ctl", 0), ("weight", 1), ("sleep", 1), ("sleep_score", 0),
-            ("stress", 0), ("body_battery", 0),
+            ("stress", 0), ("body_battery", 0), ("spo2", 1),
         ]
         for key, dec in order:
             s = r.series.get(key)
@@ -278,6 +279,34 @@ class LongitudinalPresenter:
         hrv = r.series.get("hrv")
         if hrv and hrv.note:
             lines.append(f"\n_{hrv.note}._")
+        return "\n".join(lines) + "\n"
+
+    def _respiratory(self, r: LongitudinalReport) -> str:
+        """SpO2 + resting respiration. Numbered 2b to avoid renumbering the
+        existing 1-8 sections. Renders nothing when both series are empty."""
+        spo2 = r.series.get("spo2")
+        rr = r.series.get("respiracao")
+        present = [s for s in (spo2, rr) if s and s.values]
+        if not present:
+            return ""
+        lines = ["\n## 2b. Respiratório / aclimatação a altitude\n"]
+        lines.append(
+            "SpO2 (saturação periférica de O2) e frequência respiratória de "
+            "repouso ajudam a triar tolerância a altitude e carga "
+            "respiratória/estresse. Estimativas ópticas de pulso — triagem, "
+            "não oximetria clínica.\n")
+        for s in present:
+            lines.append(self._metric_summary_line(s))
+        lines.append("")
+        cols = []
+        if spo2 and spo2.values:
+            cols.append(("SpO2 (%)", spo2, 1))
+        if rr and rr.values:
+            cols.append(("FR repouso (rpm)", rr, 1))
+        lines.append(self._months_table(r, cols))
+        for s in present:
+            if s.note:
+                lines.append(f"\n_{s.note}._")
         return "\n".join(lines) + "\n"
 
     def _aerobic(self, r: LongitudinalReport) -> str:
@@ -456,6 +485,9 @@ class LongitudinalPresenter:
             "- Datas/horas já estão no **horário local** do atleta "
             f"({r.athlete.timezone or 'America/Sao_Paulo'}) — convertidas de UTC na "
             "importação — então o agrupamento mensal é por dia-calendário local.\n"
+            "- **SpO2 e frequência respiratória** são estimativas do sensor "
+            "óptico de pulso (Pulse Ox / respiração), não oximetria/capnografia "
+            "clínica — usar para tendência e triagem de altitude, não diagnóstico.\n"
             "- **Este relatório é um resumo de telemetria longitudinal, não uma anamnese "
             "completa.** Ele não substitui a história clínica coletada pelo médico "
             "(ver seção 8).\n"

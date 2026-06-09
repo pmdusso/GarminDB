@@ -302,6 +302,13 @@ class LongitudinalReportBuilder:
             key="body_battery", label="Body Battery (pico)", unit="",
             better="up", decimals=0,
         )
+        series["spo2"] = self._daily_series(
+            "garmin.db", "daily_summary", "spo2_avg", "day",
+            key="spo2", label="SpO2 (saturação de O2)", unit="%", better="up",
+            decimals=1,
+            coverage_note=("relevante para aclimatação a altitude "
+                           "(prova de montanha); estimativa óptica de pulso"),
+        )
         series["vo2max_cycling"] = self._vo2max_series("cycle_activities")
         series["vo2max_running"] = self._vo2max_series("steps_activities")
         series["ctl"] = self._ctl_series(load_months)
@@ -635,6 +642,7 @@ class LongitudinalReportBuilder:
     def _daily_series(
         self, db: str, table: str, col: str, day_col: str,
         *, key: str, label: str, unit: str, better: str, decimals: int,
+        coverage_note: Optional[str] = None,
     ) -> MetricSeries:
         rows = self._query(
             db,
@@ -653,6 +661,11 @@ class LongitudinalReportBuilder:
         s.points = self._monthly_mean_points(daily, decimals)
         s.baseline, s.baseline_low, s.baseline_high = \
             self._baseline_band(daily, decimals)
+        # Declare coverage explicitly when asked (data-honesty: the reader is a
+        # clinician and must see how many days back a trend). Default None keeps
+        # the existing callers (rhr/stress/etc.) unchanged.
+        if coverage_note is not None and daily:
+            s.note = f"{len(daily)} dias medidos no período — {coverage_note}"
         return s
 
     def _hrv_series(self) -> MetricSeries:
