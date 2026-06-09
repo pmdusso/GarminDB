@@ -7,7 +7,7 @@ targets, and computes a scorecard, readiness light, deltas and priorities.
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 
 from .models import (
@@ -65,6 +65,26 @@ def _run_stress(repository, start, end) -> StressAnalysisResult:
     return StressAnalyzer(repository).analyze(start, end)
 
 
+def _weight_near(repository, target: date, window_days: int = 7):
+    """Median bodyweight within +/-window_days of target (None if none).
+
+    Defensive: a repository (or test double) lacking get_weight_series yields
+    None rather than crashing build().
+    """
+    if target is None:
+        return None
+    getter = getattr(repository, "get_weight_series", None)
+    if getter is None:
+        return None
+    series = getter(
+        target - timedelta(days=window_days), target + timedelta(days=window_days))
+    vals = sorted(w for _, w in series) if series else []
+    if not vals:
+        return None
+    mid = len(vals) // 2
+    return vals[mid] if len(vals) % 2 else (vals[mid - 1] + vals[mid]) / 2
+
+
 @dataclass
 class ScorecardRow:
     """One row of the executive scorecard."""
@@ -103,6 +123,8 @@ class PerformanceReport:
 
     deltas: Dict[str, MetricDelta]
     metric_snapshot: Dict[str, float] = field(default_factory=dict)
+    eftp_measured: Optional[float] = None
+    wkg_measured: Optional[float] = None
 
 
 class PerformanceReportBuilder:
@@ -128,6 +150,12 @@ class PerformanceReportBuilder:
 
         ftp_used = t.ftp_watts or power.estimated_ftp
         wkg = (ftp_used / weight) if (ftp_used and weight) else None
+        # Pair the eFTP to a weigh-in within +/-7 d of the effort; if none exists
+        # we do NOT fall back to the period weight, so the "peso pareado +/-7 d"
+        # label in the renderer is never false (measured W/kg is simply omitted).
+        eftp_weight = _weight_near(self._repo, power.eftp_date)
+        wkg_measured = ((power.eftp_measured / eftp_weight)
+                        if (power.eftp_measured and eftp_weight) else None)
 
         ctl = activity.training_stress.ctl if activity.training_stress else None
         tsb = activity.training_stress.tsb if activity.training_stress else None
@@ -146,6 +174,7 @@ class PerformanceReportBuilder:
             activity=activity, recovery=recovery, sleep=sleep, stress=stress,
             current_weight_kg=weight, wkg_current=wkg, ftp_used=ftp_used,
             vo2max=vo2max, deltas=deltas, metric_snapshot=snapshot,
+            eftp_measured=power.eftp_measured, wkg_measured=wkg_measured,
         )
 
     def _current_weight(self, start_date, end_date) -> Optional[float]:

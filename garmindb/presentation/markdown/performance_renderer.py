@@ -24,6 +24,7 @@ class PerformancePresenter:
         parts.append(self._header(report))
         parts.append(self._readiness(report))
         parts.append(self._scorecard(report))
+        parts.append(self.render_power_block(report.power, report.wkg_measured))
         parts.append(self._coverage(report))
         parts.append(self._priorities(report))
         return "\n".join(p for p in parts if p).rstrip() + "\n"
@@ -75,6 +76,57 @@ class PerformancePresenter:
                 f"| {row.label} | {row.current} | {row.target} | "
                 f"{row.gap} | {self._delta_cell(row)} |"
             )
+        return "\n".join(lines) + "\n"
+
+    @staticmethod
+    def render_power_block(power, wkg_measured=None) -> str:
+        """Measured-vs-configured power section. Renders nothing if no power."""
+        if power is None or power.total_rides == 0:
+            return ""
+
+        def w(v, nd=0):
+            return f"{v:.{nd}f}".replace(".", ",") if v is not None else _NO_VALUE
+
+        lines = ["\n## Potência (medida vs configurada)\n"]
+        lines.append(f"- **FTP configurado:** {w(power.configured_ftp)} W (meta)")
+        if power.gate and power.gate.published and power.eftp_measured:
+            src = ("outdoor" if power.eftp_source == "outdoor"
+                   else "indoor (~8–12% abaixo do outdoor)")
+            gap = (power.eftp_measured - power.configured_ftp
+                   if power.configured_ftp else None)
+            lines.append(
+                f"- **eFTP medido:** {w(power.eftp_measured)} W — fonte {src}; "
+                f"melhor 20-min × 0,95 ({power.gate.candidate_count} pedais, "
+                "janela 6 sem). Estimativa de campo, não teste de laboratório."
+                + (f" Gap vs configurado: {w(gap)} W." if gap is not None else ""))
+            if wkg_measured is not None:
+                lines.append(f"- **W·kg medido:** {w(wkg_measured, 2)} "
+                             "(eFTP ÷ peso pareado ±7 d do esforço)")
+        else:
+            reason = power.gate.reason if power.gate else "sem esforço qualificado"
+            lines.append(f"- **eFTP medido:** não publicado — {reason}.")
+        if power.peak_5s:
+            lines.append(f"- **Pico neuromuscular (5 s):** {w(power.peak_5s)} W "
+                         "(maxAvgPower_5; nunca o pico de 1 s, que é ruído).")
+        if power.np_variability_ratio:
+            lines.append(
+                f"- **Variabilidade (NP/méd, ≥30 min):** "
+                f"{w(power.np_variability_ratio, 2)} sobre "
+                f"{power.np_long_ride_count} pedais (1,0 = constante).")
+        # Curves (indoor/outdoor) at the key durations.
+        labels = [(5, "5 s"), (60, "1 min"), (300, "5 min"),
+                  (1200, "20 min"), (3600, "60 min")]
+        lines.append("\n| Duração | Outdoor (W) | Indoor (W) |")
+        lines.append("|---|---|---|")
+        for d, lab in labels:
+            lines.append(f"| {lab} | {w(power.curve_outdoor.get(d))} | "
+                         f"{w(power.curve_indoor.get(d))} |")
+        # Zone distribution (already computed by the analyzer; previously dropped).
+        if power.power_zone_distribution:
+            znames = {1: "Z1", 2: "Z2", 3: "Z3", 4: "Z4", 5: "Z5", 6: "Z6", 7: "Z7"}
+            zbits = [f"{znames.get(z, z)} {p:.0f}%"
+                     for z, p in sorted(power.power_zone_distribution.items())]
+            lines.append("\n**Zonas de potência (% do tempo):** " + " · ".join(zbits))
         return "\n".join(lines) + "\n"
 
     def _coverage(self, r: PerformanceReport) -> str:
