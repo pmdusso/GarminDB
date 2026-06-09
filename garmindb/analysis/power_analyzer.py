@@ -72,6 +72,11 @@ class PowerAnalysisResult:
     total_rides: int
     ftp_needs_test: bool
     skipped_files: int = 0                 # corrupt/unreadable JSONs ignored
+    curve_indoor: Dict[int, float] = field(default_factory=dict)
+    curve_outdoor: Dict[int, float] = field(default_factory=dict)
+    eftp_indoor: Optional[float] = None    # indoor best-20 * 0.95 (ungated)
+    eftp_outdoor: Optional[float] = None   # outdoor best-20 * 0.95 (ungated)
+    peak_5s: Optional[float] = None        # best maxAvgPower_5 (neuromuscular)
     insights: List[Insight] = field(default_factory=list)
 
 
@@ -214,6 +219,18 @@ class PowerAnalyzer:
             self._ftp and best20_recent and self._ftp > best20_recent
         )
 
+        usable = [r for r in all_rides if not r.exclude]
+        indoor = [r for r in usable if r.is_indoor]
+        outdoor = [r for r in usable if not r.is_indoor]
+        curve_indoor = self._best_curve(indoor)
+        curve_outdoor = self._best_curve(outdoor)
+        eftp_indoor = (round(curve_indoor[1200] * 0.95)
+                       if curve_indoor.get(1200) else None)
+        eftp_outdoor = (round(curve_outdoor[1200] * 0.95)
+                        if curve_outdoor.get(1200) else None)
+        peak_5s = max((r.peak_power[5] for r in usable if 5 in r.peak_power),
+                      default=None)
+
         result = PowerAnalysisResult(
             period_start=start_date,
             period_end=end_date,
@@ -228,6 +245,11 @@ class PowerAnalyzer:
             total_rides=len(all_rides),
             ftp_needs_test=ftp_needs_test,
             skipped_files=skipped_files,
+            curve_indoor=curve_indoor,
+            curve_outdoor=curve_outdoor,
+            eftp_indoor=eftp_indoor,
+            eftp_outdoor=eftp_outdoor,
+            peak_5s=peak_5s,
         )
         logger.debug(
             "Power analysis %s..%s: %d ride(s) total, %d recent with power, "
