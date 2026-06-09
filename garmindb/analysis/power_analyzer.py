@@ -101,6 +101,8 @@ class PowerAnalysisResult:
     eftp_measured: Optional[float] = None  # gated headline eFTP
     eftp_source: Optional[str] = None      # "outdoor" | "indoor" | None
     eftp_date: Optional[date] = None       # date of the qualifying 20-min effort
+    np_variability_ratio: Optional[float] = None  # mean(NP/avg) over long rides, indoor+outdoor mixed
+    np_long_ride_count: int = 0            # rides with duration >= 1800s
     insights: List[Insight] = field(default_factory=list)
 
 
@@ -316,6 +318,16 @@ class PowerAnalyzer:
             gate = out_gate if outdoor else in_gate
             eftp_measured = eftp_source = eftp_date = None
 
+        long_recent = [
+            r for r in recent
+            if not r.exclude and r.duration_s and r.duration_s >= 1800
+            and r.norm_power and r.avg_power and r.avg_power > 0
+        ]
+        np_ratios = [r.norm_power / r.avg_power for r in long_recent]
+        np_variability_ratio = (round(sum(np_ratios) / len(np_ratios), 2)
+                                if np_ratios else None)
+        np_long_ride_count = len(long_recent)
+
         result = PowerAnalysisResult(
             period_start=start_date,
             period_end=end_date,
@@ -339,6 +351,8 @@ class PowerAnalyzer:
             eftp_measured=eftp_measured,
             eftp_source=eftp_source,
             eftp_date=eftp_date,
+            np_variability_ratio=np_variability_ratio,
+            np_long_ride_count=np_long_ride_count,
         )
         logger.debug(
             "Power analysis %s..%s: %d ride(s) total, %d recent with power, "
@@ -369,5 +383,26 @@ class PowerAnalyzer:
                 recommendations=[
                     "Faça um teste de 20 min ou rampa nas próximas 2 semanas",
                 ],
+            ))
+        gate = result.gate
+        if gate is not None and gate.published and result.eftp_measured:
+            src = "outdoor" if result.eftp_source == "outdoor" else \
+                "indoor (~8-12% abaixo do outdoor)"
+            insights.append(Insight(
+                # Title carries no bare "FTP" token so it stays clear of the
+                # ftp_needs_test title guards used by callers.
+                title="Potência de campo estimada disponível",
+                description=(
+                    f"eFTP estimado {result.eftp_measured:.0f} W "
+                    f"(fonte {src}; melhor 20-min x 0,95, "
+                    f"{gate.candidate_count} pedais na janela de 6 semanas). "
+                    "Estimativa de campo, não teste de laboratório."
+                ),
+                severity=InsightSeverity.INFO,
+                category="power",
+                data_points={"eftp_measured": result.eftp_measured,
+                             "source": result.eftp_source},
+                recommendations=["Comparar com a FTP configurada; "
+                                 "revalidar com teste se divergirem"],
             ))
         return insights

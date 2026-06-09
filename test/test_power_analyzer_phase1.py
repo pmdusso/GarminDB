@@ -152,3 +152,60 @@ def test_gate_falls_back_to_indoor_label(tmp_path):
     assert r.gate.published is True
     assert r.gate.source_env == "indoor"
     assert r.eftp_source == "indoor"
+
+
+# --------------------------------------------------------------------------- #
+# Task 4 — NP variability (>=30min) + gate-aware insight
+# --------------------------------------------------------------------------- #
+
+def test_np_variability_uses_only_long_rides(tmp_path):
+    folder = str(tmp_path)
+    end = date(2026, 6, 7)
+    # Long ride: counts. avg 200, NP 220 -> ratio 1.10.
+    _write(folder, 1, "2026-05-20", indoor=False, maxAvgPower_1200=290,
+           avgPower=200.0, normPower=220.0, duration=3600.0)
+    # Short ride: NP must be ignored (duration < 1800s).
+    _write(folder, 2, "2026-05-21", indoor=False, maxAvgPower_1200=280,
+           avgPower=150.0, normPower=300.0, duration=600.0)
+    r = PowerAnalyzer(folder, configured_ftp=325).analyze(date(2026, 1, 1), end)
+    assert r.np_long_ride_count == 1
+    assert abs(r.np_variability_ratio - 1.10) < 0.01
+
+
+def test_gate_insight_present_when_published(tmp_path):
+    folder = str(tmp_path)
+    end = date(2026, 6, 7)
+    for i, day in enumerate(("2026-05-20", "2026-05-27", "2026-06-02"), 1):
+        _write(folder, i, day, indoor=False, maxAvgPower_1200=305,
+               normPower=295.0, duration=3600.0)
+    r = PowerAnalyzer(folder, configured_ftp=325).analyze(date(2026, 1, 1), end)
+    gate_insights = [i for i in r.insights if "Potência de campo" in i.title]
+    assert gate_insights                                   # gate insight present
+    assert not any("FTP" in i.title for i in gate_insights)   # title stays collision-free
+
+
+def test_gate_fails_on_soft_rides_if_below_threshold(tmp_path):
+    # 3 recent rides in-window with 20-min data, but NP well below 0.90*325
+    # (soft Z2 block) -> if_ok False -> gate does not publish.
+    folder = str(tmp_path)
+    end = date(2026, 6, 7)
+    for i, day in enumerate(("2026-05-20", "2026-05-27", "2026-06-02"), 1):
+        _write(folder, i, day, indoor=False, maxAvgPower_1200=240,
+               normPower=200.0, duration=3600.0)   # 200/325 = 0.615 < 0.90
+    r = PowerAnalyzer(folder, configured_ftp=325).analyze(date(2026, 1, 1), end)
+    assert r.gate.candidate_count == 3
+    assert r.gate.recency_ok is True
+    assert r.gate.if_ok is False
+    assert r.gate.published is False
+    assert r.eftp_measured is None
+
+
+def test_np_variability_none_when_no_long_rides(tmp_path):
+    folder = str(tmp_path)
+    end = date(2026, 6, 7)
+    # Only a short (<1800s) ride -> no long-ride NP sample -> ratio None.
+    _write(folder, 1, "2026-05-20", indoor=False, maxAvgPower_1200=280,
+           avgPower=150.0, normPower=300.0, duration=600.0)
+    r = PowerAnalyzer(folder, configured_ftp=325).analyze(date(2026, 1, 1), end)
+    assert r.np_variability_ratio is None
+    assert r.np_long_ride_count == 0
