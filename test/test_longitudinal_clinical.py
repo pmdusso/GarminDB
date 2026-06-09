@@ -267,3 +267,32 @@ def test_hrv_status_absent_when_no_status_rows(tmp_path):
     report = _builder(tmp_path, date(2025, 1, 1), date(2025, 2, 28)).build()
     assert report.hrv_status_latest is None
     assert report.hrv_status_balanced_pct is None
+
+
+# --------------------------------------------------------------------------- #
+# Body Battery recharge + sleep architecture
+# --------------------------------------------------------------------------- #
+
+def test_bb_charged_and_sleep_architecture(tmp_path):
+    daily = _spread_daily(date(2025, 1, 1), 3,
+                          lambda ym: {"bb_charged": 60, "bb_max": 90})
+    sleep = {}
+    for d in daily:
+        sleep[d] = {"total": "07:30:00", "deep": "01:30:00",
+                    "light": "04:00:00", "rem": "02:00:00", "awake": "00:20:00",
+                    "avg_stress": 18.0, "score": 80}
+    _write_garmin_db(str(tmp_path), daily=daily, sleep=sleep)
+    _write_activities_db(str(tmp_path), [])
+    _write_monitoring_db(str(tmp_path), {})
+    report = _builder(tmp_path, date(2025, 1, 1), date(2025, 3, 31)).build()
+    assert report.series["bb_charged"].current == 60.0
+    assert report.series["bb_charged"].better == "up"
+    assert report.series["sleep_deep"].current == 1.5      # 1h30 -> 1.5 h
+    assert report.series["sleep_rem"].current == 2.0
+    # 00:20:00 = 0.3333 h; monthly means are stored at 4 dp, so compare at 2 dp.
+    assert round(report.series["sleep_awake"].current, 2) == 0.33
+    assert report.series["sleep_stress"].current == 18.0
+    md = LongitudinalPresenter().render(report)
+    assert "recarga noturna" in md
+    assert "Sono profundo" in md
+    assert "Arquitetura do sono" in md

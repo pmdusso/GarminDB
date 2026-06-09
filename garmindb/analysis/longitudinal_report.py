@@ -309,6 +309,28 @@ class LongitudinalReportBuilder:
             key="body_battery", label="Body Battery (pico)", unit="",
             better="up", decimals=0,
         )
+        series["bb_charged"] = self._daily_series(
+            "garmin.db", "daily_summary", "bb_charged", "day",
+            key="bb_charged", label="Body Battery (recarga noturna)", unit="",
+            better="up", decimals=0,
+            coverage_note="recarga durante o sono (reserva de recuperação)",
+        )
+        series["sleep_deep"] = self._sleep_stage_series(
+            "deep_sleep", key="sleep_deep", label="Sono profundo", better="up")
+        series["sleep_light"] = self._sleep_stage_series(
+            "light_sleep", key="sleep_light", label="Sono leve",
+            better="neutral")
+        series["sleep_rem"] = self._sleep_stage_series(
+            "rem_sleep", key="sleep_rem", label="Sono REM", better="up")
+        series["sleep_awake"] = self._sleep_stage_series(
+            "awake", key="sleep_awake", label="Acordado (na cama)",
+            better="down")
+        series["sleep_stress"] = self._daily_series(
+            "garmin.db", "sleep", "avg_stress", "day",
+            key="sleep_stress", label="Estresse durante o sono", unit="",
+            better="down", decimals=0,
+            coverage_note="estresse autonômico médio medido durante o sono",
+        )
         series["spo2"] = self._daily_series(
             "garmin.db", "daily_summary", "spo2_avg", "day",
             key="spo2", label="SpO2 (saturação de O2)", unit="%", better="up",
@@ -790,6 +812,30 @@ class LongitudinalReportBuilder:
                 daily[day] = _parse_hms(total) / 3600.0
         s = MetricSeries(key="sleep", label="Sono total", unit="h",
                          better="up", decimals=1)
+        s.points = self._monthly_mean_points(daily, 2)
+        s.baseline = round(s.mean, 1) if s.mean is not None else None
+        return s
+
+    def _sleep_stage_series(
+        self, col: str, *, key: str, label: str, better: str,
+    ) -> MetricSeries:
+        """Monthly mean of one sleep stage (stored as a TIME string), in hours."""
+        rows = self._query(
+            "garmin.db",
+            f"SELECT day, {col} FROM sleep "
+            f"WHERE date(day) >= ? AND date(day) <= ? AND {col} IS NOT NULL",
+            (self._start.isoformat(), self._end.isoformat()),
+        )
+        daily = {}
+        for d, val in rows:
+            day = _parse_date(d)
+            if day is None or val is None:
+                continue
+            hours = _parse_hms(val) / 3600.0
+            if hours > 0:
+                daily[day] = hours
+        s = MetricSeries(key=key, label=label, unit="h", better=better,
+                         decimals=1)
         s.points = self._monthly_mean_points(daily, 2)
         s.baseline = round(s.mean, 1) if s.mean is not None else None
         return s

@@ -412,15 +412,28 @@ class LongitudinalPresenter:
         lines.append(
             "Sono é o principal substrato de recuperação; o teto de Body Battery "
             "integra carga e recuperação num único proxy de reserva energética.\n")
-        for key in ("sleep", "sleep_score", "body_battery"):
+        for key in ("sleep", "sleep_score", "body_battery", "bb_charged"):
             lines.append(self._metric_summary_line(r.series.get(key)))
         lines.append("")
         lines.append(self._months_table(
             r,
             [("Sono (h)", r.series.get("sleep"), 1),
              ("Pont. sono", r.series.get("sleep_score"), 0),
-             ("BB pico", r.series.get("body_battery"), 0)],
+             ("BB pico", r.series.get("body_battery"), 0),
+             ("BB recarga", r.series.get("bb_charged"), 0)],
         ))
+        # Sleep architecture: only render when at least one stage has data.
+        stages = [("Sono profundo (h)", r.series.get("sleep_deep"), 1),
+                  ("Sono leve (h)", r.series.get("sleep_light"), 1),
+                  ("Sono REM (h)", r.series.get("sleep_rem"), 1),
+                  ("Acordado (h)", r.series.get("sleep_awake"), 1),
+                  ("Estresse sono", r.series.get("sleep_stress"), 0)]
+        if any(s and s.values for _, s, _ in stages):
+            lines.append("\n**Arquitetura do sono (médias mensais):**\n")
+            lines.append(self._months_table(r, stages))
+            lines.append(
+                "\n_Estágios de sono e estresse são estimativas do dispositivo "
+                "(não polissonografia); úteis como tendência de qualidade._")
         return "\n".join(lines) + "\n"
 
     def _body_composition(self, r: LongitudinalReport) -> str:
