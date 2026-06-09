@@ -27,6 +27,12 @@ GATE_MIN_CANDIDATES = 3       # >=3 rides carrying maxAvgPower_1200 in window
 GATE_MIN_IF = 0.90           # IF = normPower / configured FTP
 EFTP_MULTIPLIER = 0.95       # best 20-min * 0.95
 
+# Rider-relative plausibility ceiling for the 5 s neuromuscular peak: a best
+# 5 s above this multiple of the rider's own best 1-min power is almost always
+# a trainer/dropout spike (real data: a 1448 W indoor spike), not a sprint.
+# Such 5 s values are dropped and the next-best plausible 5 s is used instead.
+PEAK_5S_TO_1MIN_RATIO = 2.2
+
 CYCLING_TYPES = {
     "cycling", "virtual_ride", "road_biking", "indoor_cycling",
     "gravel_cycling", "mountain_biking",
@@ -96,7 +102,8 @@ class PowerAnalysisResult:
     curve_outdoor: Dict[int, float] = field(default_factory=dict)  # all-time
     eftp_indoor: Optional[float] = None    # indoor best-20 * 0.95 (ungated)
     eftp_outdoor: Optional[float] = None   # outdoor best-20 * 0.95 (ungated)
-    peak_5s: Optional[float] = None        # all-time best maxAvgPower_5 (neuromuscular)
+    peak_5s: Optional[float] = None        # best PLAUSIBLE maxAvgPower_5 (neuromuscular)
+    peak_5s_dropped: int = 0               # 5 s readings dropped as spikes (ratio cap)
     gate: Optional["PowerGate"] = None
     eftp_measured: Optional[float] = None  # gated headline eFTP
     eftp_source: Optional[str] = None      # "outdoor" | "indoor" | None
@@ -183,6 +190,30 @@ class PowerAnalyzer:
             if vals:
                 curve[d] = max(vals)
         return curve
+
+    @staticmethod
+    def _neuromuscular_peak(
+        rides: List["PowerRide"],
+    ) -> Tuple[Optional[float], int]:
+        """Best plausible 5 s power + count of dropped spike readings.
+
+        A 5 s peak above PEAK_5S_TO_1MIN_RATIO x the rider's own best 1-min
+        power is almost always a trainer/dropout spike, not a sprint. Drop such
+        values and return the next-best plausible 5 s. With no 1-min reference
+        the ratio cannot be applied, so the raw best 5 s is returned unfiltered.
+        """
+        fives = sorted((r.peak_power[5] for r in rides if 5 in r.peak_power),
+                       reverse=True)
+        if not fives:
+            return None, 0
+        best_1min = max((r.peak_power[60] for r in rides if 60 in r.peak_power),
+                        default=None)
+        if not best_1min:
+            return fives[0], 0
+        ceiling = PEAK_5S_TO_1MIN_RATIO * best_1min
+        plausible = [v for v in fives if v <= ceiling]
+        dropped = len(fives) - len(plausible)
+        return (plausible[0] if plausible else None), dropped
 
     def _load_rides(self) -> Tuple[List["PowerRide"], int]:
         """Glob the activities dir and parse all cycling rides with power.
@@ -301,8 +332,7 @@ class PowerAnalyzer:
                        if curve_indoor.get(1200) else None)
         eftp_outdoor = (round(curve_outdoor[1200] * 0.95)
                         if curve_outdoor.get(1200) else None)
-        peak_5s = max((r.peak_power[5] for r in usable if 5 in r.peak_power),
-                      default=None)
+        peak_5s, peak_5s_dropped = self._neuromuscular_peak(usable)
 
         out_gate, out_eftp, out_date = self._gate_env(outdoor, end_date, "outdoor")
         in_gate, in_eftp, in_date = self._gate_env(indoor, end_date, "indoor")
@@ -347,6 +377,7 @@ class PowerAnalyzer:
             eftp_indoor=eftp_indoor,
             eftp_outdoor=eftp_outdoor,
             peak_5s=peak_5s,
+            peak_5s_dropped=peak_5s_dropped,
             gate=gate,
             eftp_measured=eftp_measured,
             eftp_source=eftp_source,

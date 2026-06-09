@@ -106,8 +106,12 @@ class PerformancePresenter:
             reason = power.gate.reason if power.gate else "sem esforço qualificado"
             lines.append(f"- **eFTP medido:** não publicado — {reason}.")
         if power.peak_5s:
+            dropped = getattr(power, "peak_5s_dropped", 0) or 0
+            extra = (f" {dropped} leitura(s) de 5 s descartada(s) como ruído."
+                     if dropped else "")
             lines.append(f"- **Pico neuromuscular (5 s):** {w(power.peak_5s)} W "
-                         "(maxAvgPower_5; nunca o pico de 1 s, que é ruído).")
+                         "(maxAvgPower_5; nunca o pico de 1 s, que é ruído)."
+                         + extra)
         if power.np_variability_ratio:
             lines.append(
                 f"- **Variabilidade (NP/méd, ≥30 min):** "

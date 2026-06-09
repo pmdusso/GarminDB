@@ -84,6 +84,55 @@ def test_separate_indoor_outdoor_curves_and_peak(tmp_path):
     assert r.peak_5s == 820            # best 5-s across all (outdoor here)
 
 
+# --------------------------------------------------------------------------- #
+# SP5 — 5 s neuromuscular peak plausibility ceiling (ratio to best 1-min)
+# --------------------------------------------------------------------------- #
+
+def test_peak_5s_spike_dropped_uses_next_best(tmp_path):
+    folder = str(tmp_path)
+    # Ride A: a 1448 W indoor trainer spike (2.9x the 500 W 1-min best) -> drop.
+    _write(folder, 1, "2026-05-10", indoor=True, maxAvgPower_1200=260,
+           maxAvgPower_60=500, maxAvgPower_5=1448, duration=3600.0)
+    # Ride B: a genuine 820 W sprint (1.8x its 450 W 1-min) -> kept.
+    _write(folder, 2, "2026-05-12", indoor=False, maxAvgPower_1200=300,
+           maxAvgPower_60=450, maxAvgPower_5=820, duration=5400.0)
+    r = PowerAnalyzer(folder, configured_ftp=325).analyze(
+        date(2026, 1, 1), date(2026, 6, 7))
+    assert r.peak_5s == 820          # spike dropped, next-best plausible used
+    assert r.peak_5s_dropped == 1
+
+
+def test_peak_5s_within_ceiling_is_kept(tmp_path):
+    folder = str(tmp_path)
+    _write(folder, 1, "2026-05-12", indoor=False, maxAvgPower_1200=300,
+           maxAvgPower_60=450, maxAvgPower_5=900, duration=5400.0)
+    r = PowerAnalyzer(folder, configured_ftp=325).analyze(
+        date(2026, 1, 1), date(2026, 6, 7))
+    assert r.peak_5s == 900          # 900 <= 2.2 * 450 = 990
+    assert r.peak_5s_dropped == 0
+
+
+def test_peak_5s_all_dropped_returns_none(tmp_path):
+    folder = str(tmp_path)
+    _write(folder, 1, "2026-05-12", indoor=False, maxAvgPower_1200=300,
+           maxAvgPower_60=500, maxAvgPower_5=1448, duration=5400.0)
+    r = PowerAnalyzer(folder, configured_ftp=325).analyze(
+        date(2026, 1, 1), date(2026, 6, 7))
+    assert r.peak_5s is None         # only value implausible, no fallback
+    assert r.peak_5s_dropped == 1
+
+
+def test_peak_5s_no_1min_reference_passes_through(tmp_path):
+    folder = str(tmp_path)
+    # No maxAvgPower_60 anywhere -> ratio cannot be applied -> raw best 5 s.
+    _write(folder, 1, "2026-05-12", indoor=False, maxAvgPower_1200=300,
+           maxAvgPower_5=1448, duration=5400.0)
+    r = PowerAnalyzer(folder, configured_ftp=325).analyze(
+        date(2026, 1, 1), date(2026, 6, 7))
+    assert r.peak_5s == 1448
+    assert r.peak_5s_dropped == 0
+
+
 def test_excluded_ride_is_dropped_from_curves(tmp_path):
     folder = str(tmp_path)
     _write(folder, 1, "2026-05-12", indoor=False, maxAvgPower_1200=300,
