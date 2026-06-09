@@ -43,6 +43,10 @@ _LOAD_LOOKBACK_DAYS = 240
 
 _SPARK_BLOCKS = "▁▂▃▄▅▆▇█"
 
+# Garmin HRV status codes (monitoring_hrv_status.status). 5 ("ótimo") appears on
+# newer firmware; any unknown code surfaces as "código N" rather than vanishing.
+_HRV_STATUS = {2: "ruim", 3: "baixo", 4: "equilibrado", 5: "ótimo"}
+
 
 # --------------------------------------------------------------------------- #
 # Result models
@@ -230,6 +234,8 @@ class LongitudinalReport:
     days_to_race: Optional[int]
     current_month_partial: bool
     confidence_score: Optional[float]
+    hrv_status_latest: Optional[str]
+    hrv_status_balanced_pct: Optional[float]
 
 
 # --------------------------------------------------------------------------- #
@@ -285,6 +291,7 @@ class LongitudinalReportBuilder:
             decimals=0,
         )
         series["hrv"] = self._hrv_series()
+        series["hrv_weekly"] = self._hrv_weekly_series()
         series["weight"] = self._weight_series()
         series["sleep"] = self._sleep_series()
         series["sleep_score"] = self._daily_series(
@@ -325,6 +332,7 @@ class LongitudinalReportBuilder:
                                  current_load, volume)
         light, label = self._readiness(red_flags, series)
         days = self._days_to_race()
+        hrv_status_latest, hrv_status_balanced = self._hrv_status()
 
         return LongitudinalReport(
             generated_at=self._generated,
@@ -349,6 +357,8 @@ class LongitudinalReportBuilder:
             days_to_race=days,
             current_month_partial=self._end.day < 25,
             confidence_score=confidence,
+            hrv_status_latest=hrv_status_latest,
+            hrv_status_balanced_pct=hrv_status_balanced,
         )
 
     # -- db access ---------------------------------------------------------- #
@@ -701,6 +711,49 @@ class LongitudinalReportBuilder:
         s.note = (f"{len(daily)} noites medidas; VFC = média noturna rMSSD "
                   "(estimativa de pulso, não chest-strap)") if daily else None
         return s
+
+    def _hrv_weekly_series(self) -> MetricSeries:
+        """Weekly-average rMSSD trend (same ms scale as the nightly series)."""
+        rows = self._query(
+            "garmin_monitoring.db",
+            "SELECT timestamp, weekly_average FROM monitoring_hrv_status "
+            "WHERE date(timestamp) >= ? AND date(timestamp) <= ? "
+            "AND weekly_average IS NOT NULL",
+            (self._start.isoformat(), self._end.isoformat()),
+        )
+        daily = {}
+        for ts, v in rows:
+            day = _parse_date(ts)
+            if day is not None and v is not None:
+                daily[day] = float(v)
+        s = MetricSeries(key="hrv_weekly", label="VFC média semanal (Garmin)",
+                         unit="ms", better="up", decimals=0)
+        s.points = self._monthly_mean_points(daily, 0)
+        s.baseline, s.baseline_low, s.baseline_high = \
+            self._baseline_band(daily, 0)
+        return s
+
+    def _hrv_status(self) -> Tuple[Optional[str], Optional[float]]:
+        """Latest HRV status label + % of the last 30 days marked 'balanced'.
+
+        We use the categorical status (not Garmin's baseline_low/high columns,
+        which are on a different/legacy scale -- see _hrv_series).
+        """
+        rows = self._query(
+            "garmin_monitoring.db",
+            "SELECT status FROM monitoring_hrv_status "
+            "WHERE status IS NOT NULL AND status > 0 "
+            "AND date(timestamp) >= ? AND date(timestamp) <= ? "
+            "ORDER BY timestamp",
+            ((self._end - timedelta(days=30)).isoformat(),
+             self._end.isoformat()),
+        )
+        statuses = [int(r[0]) for r in rows]
+        if not statuses:
+            return None, None
+        latest = _HRV_STATUS.get(statuses[-1], f"código {statuses[-1]}")
+        balanced = 100.0 * sum(1 for s in statuses if s == 4) / len(statuses)
+        return latest, round(balanced, 0)
 
     def _weight_series(self) -> MetricSeries:
         rows = self._query(

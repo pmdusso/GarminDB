@@ -215,3 +215,55 @@ def test_anaerobic_te_monthly_mean_and_render(tmp_path):
     assert te.note is not None and "3 atividades" in te.note
     md = LongitudinalPresenter().render(report)
     assert "anaeróbico" in md
+
+
+# --------------------------------------------------------------------------- #
+# Full HRV band (weekly average + status)
+# --------------------------------------------------------------------------- #
+
+def _hrv_rows(start, months, weekly_fn, status_fn):
+    out = {}
+    y, m = start.year, start.month
+    for _ in range(months):
+        for d in range(1, 6):
+            ym = f"{y:04d}-{m:02d}"
+            out[date(y, m, d).isoformat()] = {
+                "last_night_average": weekly_fn(ym),
+                "weekly_average": weekly_fn(ym),
+                "status": status_fn(ym),
+            }
+        m += 1
+        if m > 12:
+            m, y = 1, y + 1
+    return out
+
+
+def test_hrv_weekly_series_and_status(tmp_path):
+    hrv = _hrv_rows(date(2025, 1, 1), 4,
+                    weekly_fn=lambda ym: 70.0 if ym < "2025-03" else 60.0,
+                    status_fn=lambda ym: 4 if ym < "2025-03" else 3)
+    _write_garmin_db(str(tmp_path))
+    _write_activities_db(str(tmp_path), [])
+    _write_monitoring_db(str(tmp_path), hrv)
+    report = _builder(tmp_path, date(2025, 1, 1), date(2025, 4, 30)).build()
+    weekly = report.series["hrv_weekly"]
+    assert weekly.points[0] == ("2025-01", 70.0)
+    assert weekly.current == 60.0
+    # Latest status (March/April = 3 -> "baixo"); end window is late April.
+    assert report.hrv_status_latest == "baixo"
+    assert report.hrv_status_balanced_pct == 0.0   # window is all status 3
+    md = LongitudinalPresenter().render(report)
+    assert "média semanal" in md
+    assert "Status VFC" in md
+
+
+def test_hrv_status_absent_when_no_status_rows(tmp_path):
+    # weekly_average present but status all NULL -> no status line, no crash.
+    hrv = _hrv_rows(date(2025, 1, 1), 2,
+                    weekly_fn=lambda ym: 65.0, status_fn=lambda ym: None)
+    _write_garmin_db(str(tmp_path))
+    _write_activities_db(str(tmp_path), [])
+    _write_monitoring_db(str(tmp_path), hrv)
+    report = _builder(tmp_path, date(2025, 1, 1), date(2025, 2, 28)).build()
+    assert report.hrv_status_latest is None
+    assert report.hrv_status_balanced_pct is None

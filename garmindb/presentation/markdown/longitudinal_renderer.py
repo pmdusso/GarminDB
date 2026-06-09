@@ -270,15 +270,27 @@ class LongitudinalPresenter:
         for key in ("rhr", "hrv", "stress"):
             lines.append(self._metric_summary_line(r.series.get(key)))
         lines.append("")
-        lines.append(self._months_table(
-            r,
-            [("FC rep. (bpm)", r.series.get("rhr"), 0),
-             ("VFC (ms)", r.series.get("hrv"), 0),
-             ("Estresse", r.series.get("stress"), 0)],
-        ))
+        weekly = r.series.get("hrv_weekly")
+        cols = [("FC rep. (bpm)", r.series.get("rhr"), 0),
+                ("VFC noturna (ms)", r.series.get("hrv"), 0),
+                ("Estresse", r.series.get("stress"), 0)]
+        if weekly and weekly.values:
+            cols.insert(2, ("VFC média semanal (ms)", weekly, 0))
+        lines.append(self._months_table(r, cols))
         hrv = r.series.get("hrv")
         if hrv and hrv.note:
             lines.append(f"\n_{hrv.note}._")
+        if r.hrv_status_latest:
+            extra = ""
+            if r.hrv_status_balanced_pct is not None:
+                extra = (f" · {r.hrv_status_balanced_pct:.0f}% dos últimos 30 "
+                         "dias em equilíbrio")
+            lines.append(
+                f"\n- **Status VFC (Garmin):** {r.hrv_status_latest}{extra}. "
+                "Categoria do próprio Garmin; os limites de referência do "
+                "fabricante (baseline_low/high) vêm de um algoritmo interno "
+                "cuja faixa não contém a própria média da VFC noturna exibida "
+                "acima — por isso não são plotados como faixa.")
         return "\n".join(lines) + "\n"
 
     def _respiratory(self, r: LongitudinalReport) -> str:
