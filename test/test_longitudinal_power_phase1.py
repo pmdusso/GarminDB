@@ -67,3 +67,19 @@ def test_anamnesis_no_power_files_is_honest_not_false(tmp_path):
     # No rides -> honest "configured, untested", NOT the blanket "no power data".
     assert "Não há dados de potência" not in md   # the falsehood must not reappear
     assert "configurad" in md.lower()
+
+
+def test_both_reports_agree_on_power_presence(tmp_path):
+    # With 3 hard rides, the anamnesis must NOT claim "no power data".
+    db = tmp_path / "db"; db.mkdir()
+    acts = tmp_path / "acts"; acts.mkdir()
+    _min_garmin_db(str(db))
+    for i, d in enumerate(("2026-05-20", "2026-05-27", "2026-06-02"), 1):
+        _hard_ride(str(acts), i, d, 305)
+    from garmindb.analysis.power_analyzer import PowerAnalyzer
+    power = PowerAnalyzer(str(acts), 325).analyze(date(2026, 1, 1), date(2026, 6, 7))
+    assert power.gate.published is True            # performance side sees it
+    report = _builder(db, acts, date(2026, 1, 1), date(2026, 6, 7),
+                      PerformanceTargets(ftp_watts=325)).build()
+    md = LongitudinalPresenter().render(report)
+    assert "Não há dados de potência" not in md    # anamnesis side agrees
