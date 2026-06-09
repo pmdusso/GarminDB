@@ -277,7 +277,7 @@ class ActivityRecords(ActivitiesDb.Base, idbutils.DbObject):
     __tablename__ = 'activity_records'
 
     db = ActivitiesDb
-    table_version = 3
+    table_version = 4
 
     activity_id = Column(String, ForeignKey('activities.activity_id'))
     record = Column(Integer)
@@ -291,6 +291,7 @@ class ActivityRecords(ActivitiesDb.Base, idbutils.DbObject):
     rr = Column(Float)              # breaths per minute
     altitude = Column(Float)        # feet or meters
     speed = Column(Float)           # kmph or mph
+    power = Column(Integer)         # watts
     temperature = Column(Float)     # C or F
 
     __table_args__ = (PrimaryKeyConstraint("activity_id", "record"),)
