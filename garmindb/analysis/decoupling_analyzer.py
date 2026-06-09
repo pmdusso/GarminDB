@@ -72,6 +72,38 @@ class DecouplingResult:
     insights: List[Insight] = field(default_factory=list)
 
 
+@dataclass
+class PaHrRide:
+    """One ride's power:HR (Pa:Hr) decoupling result."""
+
+    activity_id: str
+    date: date
+    moving_time_s: float
+    indoor: bool
+    ef_first: float              # power/HR, first half
+    ef_second: float             # power/HR, second half
+    decoupling_pct: float        # (ef_first - ef_second) / ef_first * 100
+    ef_overall: float            # power/HR over the analysed portion (W/bpm)
+    avg_power: float             # mean power over the analysed portion (W)
+    sample_count: int
+    steady: Optional[bool]       # True/False outdoors; None = ungated (indoor)
+
+
+@dataclass
+class PaHrResult:
+    """Output of DecouplingAnalyzer.analyze_pahr()."""
+
+    period_start: date
+    period_end: date
+    rides: List[PaHrRide] = field(default_factory=list)        # reported, date desc
+    monthly_decoupling: List[Tuple[str, Optional[float]]] = field(default_factory=list)
+    monthly_ef: List[Tuple[str, Optional[float]]] = field(default_factory=list)
+    eligible_count: int = 0      # cycling >=60min with analysable power+hr
+    analyzed_count: int = 0      # reported (steady outdoors or ungated indoors)
+    skipped_unsteady: int = 0    # outdoor rides dropped by the steadiness gate
+    insights: List[Insight] = field(default_factory=list)
+
+
 class DecouplingAnalyzer:
     """Compute Hr:speed decoupling + EF for outdoor cycling rides from the DB."""
 
@@ -240,6 +272,144 @@ class DecouplingAnalyzer:
                          "rides": len(recent)},
             recommendations=["Validar com esforço estável sub-limiar; "
                              "EF crescente ao longo dos meses = ganho aeróbico"],
+        )]
+
+    # -- Pa:Hr (power:HR) decoupling -- includes indoor (power is real) ------ #
+
+    @staticmethod
+    def _clean_power(recs, indoor):
+        """Parse records into (elapsed_s, hr, power) + the speed CV for the gate.
+
+        Keeps zero-power coasting (real load); trims warmup; drops hr<=0 / power
+        None. Outdoors, drops true stops (speed<=STOP_SPEED) and returns the
+        speed coefficient of variation for the steadiness gate. Indoors there is
+        no real speed, so the gate is skipped (speed_cv=None).
+        """
+        t0 = None
+        samples = []
+        speeds = []
+        for ts, hr, power, speed in recs:
+            day = _parse_dt(ts)
+            if day is None or hr is None or power is None:
+                continue
+            if t0 is None:
+                t0 = day
+            elapsed = (day - t0).total_seconds()
+            if elapsed < WARMUP_TRIM_S or float(hr) <= 0:
+                continue
+            if not indoor and speed is not None and float(speed) <= STOP_SPEED:
+                continue  # true stop (outdoor): HR elevated but not moving
+            samples.append((elapsed, float(hr), float(power)))
+            if speed is not None:
+                speeds.append(float(speed))
+        speed_cv = None
+        if not indoor and len(speeds) > 1:
+            mean_sp = sum(speeds) / len(speeds)
+            if mean_sp > 0:
+                speed_cv = statistics.pstdev(speeds) / mean_sp
+        return samples, speed_cv
+
+    def _pahr_ride(self, activity_id, ride_date, moving_s, indoor):
+        recs = self._query(
+            "garmin_activities.db",
+            "SELECT timestamp, hr, power, speed FROM activity_records "
+            "WHERE activity_id = ? ORDER BY record",
+            (activity_id,),
+        )
+        samples, speed_cv = self._clean_power(recs, indoor)
+        computed = self._decoupling(samples)
+        if computed is None:
+            return None
+        ef1, ef2, decoup, ef_all, _ = computed
+        avg_power = sum(p for _, _, p in samples) / len(samples)
+        steady = None if (indoor or speed_cv is None) else (speed_cv <= STEADY_CV_MAX)
+        return PaHrRide(
+            activity_id=str(activity_id), date=ride_date, moving_time_s=moving_s,
+            indoor=indoor, ef_first=round(ef1, 4), ef_second=round(ef2, 4),
+            decoupling_pct=round(decoup, 1), ef_overall=round(ef_all, 4),
+            avg_power=round(avg_power, 1), sample_count=len(samples), steady=steady,
+        )
+
+    def _has_power_column(self) -> bool:
+        """True if activity_records carries the SP1 power column (post-rebuild)."""
+        cols = self._query("garmin_activities.db",
+                           "PRAGMA table_info(activity_records)")
+        return any(c[1] == "power" for c in cols)
+
+    def analyze_pahr(self, start_date: date, end_date: date) -> "PaHrResult":
+        """Build a PaHrResult (power:HR decoupling) for cycling rides in period.
+
+        Includes indoor/trainer rides (power is meter-measured even indoors);
+        each ride is labelled indoor/outdoor. Outdoor rides pass the speed-CV
+        steadiness gate; indoor rides are reported ungated (steady=None).
+        """
+        if not self._has_power_column():
+            logger.info("activity_records has no power column yet (pre-SP1 "
+                        "rebuild); Pa:Hr is empty until garmindb_cli.py "
+                        "--rebuild_db is run.")
+            return PaHrResult(period_start=start_date, period_end=end_date)
+        rows = self._query(
+            "garmin_activities.db",
+            "SELECT activity_id, start_time, moving_time, sub_sport "
+            "FROM activities WHERE sport = 'cycling' "
+            "AND date(start_time) >= ? AND date(start_time) <= ?",
+            (start_date.isoformat(), end_date.isoformat()),
+        )
+        analysed: List[PaHrRide] = []
+        for aid, start_time, moving_time, sub_sport in rows:
+            if _parse_hms(moving_time) < MIN_MOVING_TIME_S:
+                continue
+            ride_date = _parse_dt(start_time)
+            if ride_date is None:
+                continue
+            indoor = (sub_sport or "") in INDOOR_SUBSPORTS
+            rd = self._pahr_ride(aid, ride_date.date(),
+                                 _parse_hms(moving_time), indoor)
+            if rd is not None:
+                analysed.append(rd)
+
+        reported = sorted((r for r in analysed if r.steady is not False),
+                          key=lambda r: r.date, reverse=True)
+        result = PaHrResult(
+            period_start=start_date, period_end=end_date, rides=reported,
+            monthly_decoupling=_monthly(reported, "decoupling_pct", start_date, end_date),
+            monthly_ef=_monthly(reported, "ef_overall", start_date, end_date, nd=4),
+            eligible_count=len(analysed),
+            analyzed_count=len(reported),
+            skipped_unsteady=len(analysed) - len(reported),
+        )
+        result.insights = self._pahr_insights(result, end_date)
+        return result
+
+    @staticmethod
+    def _pahr_insights(result: "PaHrResult", end_date: date) -> List[Insight]:
+        recent = [r for r in result.rides
+                  if (end_date - r.date).days <= RECENT_WINDOW_DAYS]
+        if not recent:
+            return []
+        mean_dc = sum(r.decoupling_pct for r in recent) / len(recent)
+        if mean_dc < DECOUPLE_GOOD:
+            sev, msg = (InsightSeverity.POSITIVE,
+                        "Desacoplamento potência:FC baixo (<5%): boa durabilidade "
+                        "aeróbica nas pedaladas longas recentes.")
+        elif mean_dc <= DECOUPLE_HIGH:
+            sev, msg = (InsightSeverity.INFO,
+                        "Desacoplamento potência:FC moderado (5-10%): limite "
+                        "aeróbico ou fadiga nas pedaladas longas.")
+        else:
+            sev, msg = (InsightSeverity.WARNING,
+                        "Desacoplamento potência:FC alto (>10%): esforço acima do "
+                        "limiar aeróbico ou endurance insuficiente.")
+        return [Insight(
+            title="Durabilidade aeróbica (potência:FC)",
+            description=(f"{msg} Média {mean_dc:.1f}% em {len(recent)} pedal(is) "
+                         ">=60 min com potência (indoor e outdoor; aquecimento "
+                         "removido)."),
+            severity=sev, category="endurance",
+            data_points={"mean_pahr_decoupling_pct": round(mean_dc, 1),
+                         "rides": len(recent)},
+            recommendations=["Pa:Hr usa potência medida; vale indoor e outdoor. "
+                             "Queda do desacoplamento ao longo dos meses = ganho."],
         )]
 
 

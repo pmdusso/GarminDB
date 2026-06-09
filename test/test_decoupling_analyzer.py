@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 from types import SimpleNamespace
 
 from garmindb.analysis.decoupling_analyzer import (
-    DecouplingAnalyzer, DecouplingResult, RideDecoupling, _ef,
+    DecouplingAnalyzer, DecouplingResult, RideDecoupling, PaHrResult, _ef,
 )
 from garmindb.presentation.markdown.longitudinal_renderer import (
     LongitudinalPresenter,
@@ -27,7 +27,8 @@ def _db(tmp_path):
         "sub_sport TEXT, moving_time TEXT, distance FLOAT)")
     con.execute(
         "CREATE TABLE activity_records (activity_id TEXT, record INTEGER, "
-        "timestamp TEXT, hr INTEGER, speed FLOAT, position_lat FLOAT)")
+        "timestamp TEXT, hr INTEGER, speed FLOAT, position_lat FLOAT, "
+        "power INTEGER)")
     return con
 
 
@@ -39,7 +40,7 @@ def _hms(seconds):
 
 
 def _add_ride(con, aid, day, *, minutes=70, sub_sport="generic", gps=True,
-              hr_fn=None, speed_fn=None):
+              hr_fn=None, speed_fn=None, power_fn=None):
     """Insert one ride: activities row + per-second records (1 Hz)."""
     secs = minutes * 60
     start = datetime(day.year, day.month, day.day, 9, 0, 0)
@@ -53,8 +54,10 @@ def _add_ride(con, aid, day, *, minutes=70, sub_sport="generic", gps=True,
     for i in range(secs):
         ts = (start + timedelta(seconds=i)).strftime("%Y-%m-%d %H:%M:%S")
         lat = -30.05 if gps else None
-        rows.append((str(aid), i, ts, hr_fn(i, secs), speed_fn(i, secs), lat))
-    con.executemany("INSERT INTO activity_records VALUES (?,?,?,?,?,?)", rows)
+        power = power_fn(i, secs) if power_fn else None
+        rows.append((str(aid), i, ts, hr_fn(i, secs), speed_fn(i, secs), lat,
+                     power))
+    con.executemany("INSERT INTO activity_records VALUES (?,?,?,?,?,?,?)", rows)
     con.commit()
 
 
@@ -179,3 +182,115 @@ def test_longitudinal_presenter_decoupling_absent_is_empty():
     md = LongitudinalPresenter(include_metadata=False)._decoupling(
         SimpleNamespace(decoupling=None))
     assert md == ""
+
+
+# --------------------------------------------------------------------------- #
+# SP2b: Pa:Hr (power:HR) decoupling
+# --------------------------------------------------------------------------- #
+
+def test_pahr_outdoor_decoupling(tmp_path):
+    con = _db(tmp_path)
+    # constant 200 W, HR ramps 140->160 at the analysed midpoint -> 12.5%.
+    _add_ride(con, 1, date(2026, 5, 20), hr_fn=_ramp_hr(140, 160),
+              power_fn=lambda e, t: 200)
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze_pahr(date(2026, 1, 1),
+                                                       date(2026, 6, 7))
+    assert isinstance(r, PaHrResult)
+    assert r.eligible_count == 1 and r.analyzed_count == 1
+    ride = r.rides[0]
+    assert abs(ride.decoupling_pct - 12.5) < 0.3
+    assert ride.indoor is False and ride.steady is True
+    assert abs(ride.avg_power - 200) < 1
+
+
+def test_pahr_includes_indoor_ungated(tmp_path):
+    con = _db(tmp_path)
+    _add_ride(con, 1, date(2026, 5, 21), sub_sport="indoor_cycling", gps=False,
+              hr_fn=_ramp_hr(140, 160), power_fn=lambda e, t: 200)
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze_pahr(date(2026, 1, 1),
+                                                       date(2026, 6, 7))
+    assert r.eligible_count == 1 and r.analyzed_count == 1
+    assert r.rides[0].indoor is True
+    assert r.rides[0].steady is None          # ungated indoors
+
+
+def test_pahr_no_power_ride_excluded(tmp_path):
+    con = _db(tmp_path)
+    _add_ride(con, 1, date(2026, 5, 20))      # power_fn=None -> NULL power
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze_pahr(date(2026, 1, 1),
+                                                       date(2026, 6, 7))
+    assert r.eligible_count == 0 and r.rides == []
+
+
+def test_pahr_outdoor_unsteady_gated_out(tmp_path):
+    con = _db(tmp_path)
+    _add_ride(con, 1, date(2026, 5, 20), power_fn=lambda e, t: 200,
+              speed_fn=lambda e, t: 10.0 if e % 2 == 0 else 50.0)
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze_pahr(date(2026, 1, 1),
+                                                       date(2026, 6, 7))
+    assert r.eligible_count == 1 and r.analyzed_count == 0
+    assert r.skipped_unsteady == 1 and r.rides == []
+
+
+def test_pahr_keeps_zero_power_coasting(tmp_path):
+    con = _db(tmp_path)
+    # Alternate 200 W / 0 W (coasting) while moving -> zeros are kept as load.
+    _add_ride(con, 1, date(2026, 5, 20),
+              power_fn=lambda e, t: 200 if e % 2 == 0 else 0)
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze_pahr(date(2026, 1, 1),
+                                                       date(2026, 6, 7))
+    assert r.eligible_count == 1
+    # avg ~100 W proves coasting zeros were retained, not dropped.
+    assert 80 < r.rides[0].avg_power < 120
+
+
+def _pahr_result(dc_pct, indoor=False, **kw):
+    from garmindb.analysis.decoupling_analyzer import PaHrRide
+    ride = PaHrRide(
+        activity_id="1", date=date(2026, 5, 20), moving_time_s=5400,
+        indoor=indoor, ef_first=1.43, ef_second=1.25, decoupling_pct=dc_pct,
+        ef_overall=1.34, avg_power=210.0, sample_count=4200,
+        steady=(None if indoor else True))
+    return PaHrResult(
+        period_start=date(2026, 1, 1), period_end=date(2026, 6, 7),
+        rides=[ride], monthly_decoupling=[("2026-05", dc_pct)],
+        monthly_ef=[("2026-05", 1.34)], **kw)
+
+
+def test_longitudinal_presenter_renders_pahr_with_indoor():
+    res = _pahr_result(7.5, indoor=True, eligible_count=1, analyzed_count=1)
+    md = LongitudinalPresenter(include_metadata=False)._pahr(
+        SimpleNamespace(pahr=res))
+    assert "potência:FC" in md
+    assert "7.5%" in md and "2026-05" in md and "indoor" in md
+    assert "210 W" in md
+
+
+def test_longitudinal_presenter_pahr_absent_is_empty():
+    md = LongitudinalPresenter(include_metadata=False)._pahr(
+        SimpleNamespace(pahr=None))
+    assert md == ""
+
+
+def test_pahr_short_circuits_when_no_power_column(tmp_path):
+    # Pre-SP1-rebuild DB: activity_records lacks a power column -> Pa:Hr returns
+    # empty cleanly (no per-ride query flood, no crash).
+    import sqlite3
+    con = sqlite3.connect(os.path.join(str(tmp_path), "garmin_activities.db"))
+    con.execute("CREATE TABLE activities (activity_id TEXT, start_time TEXT, "
+                "sport TEXT, sub_sport TEXT, moving_time TEXT, distance FLOAT)")
+    con.execute("CREATE TABLE activity_records (activity_id TEXT, record INTEGER, "
+                "timestamp TEXT, hr INTEGER, speed FLOAT, position_lat FLOAT)")
+    con.execute("INSERT INTO activities VALUES (?,?,?,?,?,?)",
+                ("1", "2026-05-20 09:00:00", "cycling", "generic",
+                 "01:10:00.000000", 35.0))
+    con.commit()
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze_pahr(date(2026, 1, 1),
+                                                       date(2026, 6, 7))
+    assert r.eligible_count == 0 and r.rides == [] and r.insights == []

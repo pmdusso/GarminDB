@@ -240,6 +240,7 @@ class LongitudinalReport:
     operational_max_hr: Dict[str, Optional[int]]
     power: object = None        # PowerAnalysisResult | None (avoid import cycle)
     decoupling: object = None   # DecouplingResult | None (avoid import cycle)
+    pahr: object = None         # PaHrResult | None (avoid import cycle)
 
 
 # --------------------------------------------------------------------------- #
@@ -364,6 +365,7 @@ class LongitudinalReportBuilder:
         operational_max_hr = self._operational_max_hr()
         power = self._power()
         decoupling = self._decoupling()
+        pahr = self._pahr()
 
         return LongitudinalReport(
             generated_at=self._generated,
@@ -393,6 +395,7 @@ class LongitudinalReportBuilder:
             operational_max_hr=operational_max_hr,
             power=power,
             decoupling=decoupling,
+            pahr=pahr,
         )
 
     # -- db access ---------------------------------------------------------- #
@@ -1206,6 +1209,16 @@ class LongitudinalReportBuilder:
             return DecouplingAnalyzer(self._db_dir).analyze(self._start, self._end)
         except Exception as e:  # never let decoupling break the clinical report
             logger.warning("Longitudinal decoupling analysis failed: %s", e)
+            return None
+
+    def _pahr(self):
+        """Power:HR decoupling over activity_records (None on any failure)."""
+        from .decoupling_analyzer import DecouplingAnalyzer
+        try:
+            return DecouplingAnalyzer(self._db_dir).analyze_pahr(
+                self._start, self._end)
+        except Exception as e:  # never let Pa:Hr break the clinical report
+            logger.warning("Longitudinal Pa:Hr analysis failed: %s", e)
             return None
 
     def _days_to_race(self) -> Optional[int]:

@@ -26,6 +26,7 @@ class PerformancePresenter:
         parts.append(self._scorecard(report))
         parts.append(self.render_power_block(report.power, report.wkg_measured))
         parts.append(self._decoupling(report))
+        parts.append(self._pahr(report))
         parts.append(self._coverage(report))
         parts.append(self._priorities(report))
         return "\n".join(p for p in parts if p).rstrip() + "\n"
@@ -65,6 +66,35 @@ class PerformancePresenter:
         if pct <= 10.0:
             return "🟡 moderado"
         return "🔴 alto"
+
+    def _pahr(self, r: PerformanceReport) -> str:
+        d = getattr(r, "pahr", None)
+        if d is None or d.eligible_count == 0:
+            return ""
+        lines = ["\n## 🫀 Durabilidade aeróbica (potência:FC)\n",
+                 "EF = potência/FC; desacoplamento = (EF 1ª metade − EF 2ª "
+                 "metade) / EF 1ª metade. Vale indoor e outdoor (potência é "
+                 "medida). <5% forte · 5–10% moderado · >10% acima do limiar.\n"]
+        rides = d.rides[:5]
+        if rides:
+            lines.append("| Data | Local | Dur. | Pot. méd. | EF | Desacopl. | |")
+            lines.append("|---|---|---|---|---|---|---|")
+            for ride in rides:
+                loc = "indoor" if ride.indoor else "outdoor"
+                lines.append(
+                    f"| {ride.date} | {loc} | {self._hms(ride.moving_time_s)} | "
+                    f"{ride.avg_power:.0f} W | {ride.ef_overall:.3f} | "
+                    f"{ride.decoupling_pct:.1f}% | "
+                    f"{self._dc_label(ride.decoupling_pct)} |")
+        else:
+            lines.append("_Sem pedaladas com potência suficientes no período._")
+        if d.skipped_unsteady:
+            lines.append(f"\n_{d.skipped_unsteady} pedalada(s) outdoor "
+                         "descartada(s) por variabilidade alta._")
+        lines.append("\n_Pedaladas ≥60 min com potência por segundo; aquecimento "
+                     "removido. Rides indoor entram sem porta de estabilidade "
+                     "(sem velocidade real para aferir)._")
+        return "\n".join(lines)
 
     def _decoupling(self, r: PerformanceReport) -> str:
         d = getattr(r, "decoupling", None)
