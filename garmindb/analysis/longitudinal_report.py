@@ -236,6 +236,7 @@ class LongitudinalReport:
     confidence_score: Optional[float]
     hrv_status_latest: Optional[str]
     hrv_status_balanced_pct: Optional[float]
+    operational_max_hr: Dict[str, Optional[int]]
 
 
 # --------------------------------------------------------------------------- #
@@ -355,6 +356,7 @@ class LongitudinalReportBuilder:
         light, label = self._readiness(red_flags, series)
         days = self._days_to_race()
         hrv_status_latest, hrv_status_balanced = self._hrv_status()
+        operational_max_hr = self._operational_max_hr()
 
         return LongitudinalReport(
             generated_at=self._generated,
@@ -381,6 +383,7 @@ class LongitudinalReportBuilder:
             confidence_score=confidence,
             hrv_status_latest=hrv_status_latest,
             hrv_status_balanced_pct=hrv_status_balanced,
+            operational_max_hr=operational_max_hr,
         )
 
     # -- db access ---------------------------------------------------------- #
@@ -832,6 +835,7 @@ class LongitudinalReportBuilder:
             if day is None or val is None:
                 continue
             hours = _parse_hms(val) / 3600.0
+            # Zero-duration stages are Garmin "missing data" fillers; skip them.
             if hours > 0:
                 daily[day] = hours
         s = MetricSeries(key=key, label=label, unit="h", better=better,
@@ -898,6 +902,33 @@ class LongitudinalReportBuilder:
         s.note = (f"{n} atividades com TE anaeróbico; escala 0–5 (estímulo de "
                   "alta intensidade), complementa o TE aeróbico") if n else None
         return s
+
+    def _operational_max_hr(self) -> Dict[str, Optional[int]]:
+        """Spike-trimmed max-HR ceiling per main sport.
+
+        A single optical misread can spike one activity's max_hr to ~230. Taking
+        the value at index int(0.95*(n-1)) of the ascending per-activity list
+        discards that lone top spike while keeping a realistic ceiling. This is
+        NOT a tested/strap HR max, it only contextualises HR zones. At small n
+        (< ~20 activities) the floor of 0.95*(n-1) lands well below p95, so the
+        ceiling is intentionally conservative (the clinically safe direction:
+        narrower zones, not inflated).
+        """
+        out: Dict[str, Optional[int]] = {}
+        for sport in ("cycling", "running"):
+            rows = self._query(
+                "garmin_activities.db",
+                "SELECT max_hr FROM activities WHERE sport = ? "
+                "AND max_hr IS NOT NULL AND max_hr > 0 "
+                "AND date(start_time) >= ? AND date(start_time) <= ?",
+                (sport, self._start.isoformat(), self._end.isoformat()),
+            )
+            vals = sorted(int(r[0]) for r in rows if r[0] is not None)
+            if not vals:
+                out[sport] = None
+                continue
+            out[sport] = vals[int(0.95 * (len(vals) - 1))]
+        return out
 
     # -- series helpers ----------------------------------------------------- #
 

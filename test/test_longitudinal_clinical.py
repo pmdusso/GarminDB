@@ -296,3 +296,37 @@ def test_bb_charged_and_sleep_architecture(tmp_path):
     assert "recarga noturna" in md
     assert "Sono profundo" in md
     assert "Arquitetura do sono" in md
+
+
+# --------------------------------------------------------------------------- #
+# Operational max HR
+# --------------------------------------------------------------------------- #
+
+def test_operational_max_hr_drops_spike(tmp_path):
+    _write_garmin_db(str(tmp_path))
+    _write_activities_db(str(tmp_path), [
+        {"id": 1, "day": "2025-02-01", "sport": "cycling", "max_hr": 150},
+        {"id": 2, "day": "2025-02-05", "sport": "cycling", "max_hr": 155},
+        {"id": 3, "day": "2025-02-10", "sport": "cycling", "max_hr": 158},
+        {"id": 4, "day": "2025-02-15", "sport": "cycling", "max_hr": 160},
+        {"id": 5, "day": "2025-02-20", "sport": "cycling", "max_hr": 230},
+        {"id": 6, "day": "2025-02-02", "sport": "running", "max_hr": 175},
+    ])
+    _write_monitoring_db(str(tmp_path), {})
+    report = _builder(tmp_path, date(2025, 1, 1), date(2025, 2, 28)).build()
+    # idx = int(0.95 * (5-1)) = 3 -> sorted[3] = 160, the 230 spike is dropped.
+    assert report.operational_max_hr["cycling"] == 160
+    assert report.operational_max_hr["running"] == 175    # single value
+    md = LongitudinalPresenter().render(report)
+    assert "FC máx operacional" in md
+    assert "ciclismo ~160 bpm" in md
+
+
+def test_operational_max_hr_empty_when_no_activities(tmp_path):
+    _write_garmin_db(str(tmp_path))
+    _write_activities_db(str(tmp_path), [])
+    _write_monitoring_db(str(tmp_path), {})
+    report = _builder(tmp_path, date(2025, 1, 1), date(2025, 2, 28)).build()
+    assert report.operational_max_hr == {"cycling": None, "running": None}
+    md = LongitudinalPresenter().render(report)
+    assert "FC máx operacional" not in md

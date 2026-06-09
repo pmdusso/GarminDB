@@ -291,6 +291,17 @@ class LongitudinalPresenter:
                 "fabricante (baseline_low/high) vêm de um algoritmo interno "
                 "cuja faixa não contém a própria média da VFC noturna exibida "
                 "acima — por isso não são plotados como faixa.")
+        omh = r.operational_max_hr or {}
+        omh_parts = []
+        if omh.get("cycling") is not None:
+            omh_parts.append(f"ciclismo ~{omh['cycling']} bpm")
+        if omh.get("running") is not None:
+            omh_parts.append(f"corrida ~{omh['running']} bpm")
+        if omh_parts:
+            lines.append(
+                "\n- **FC máx operacional** (p95 das atividades, descarta spike "
+                "de sensor): " + " · ".join(omh_parts) + " — **não** é FC máx de "
+                "teste com cinta; usar só para contextualizar zonas.")
         return "\n".join(lines) + "\n"
 
     def _respiratory(self, r: LongitudinalReport) -> str:
