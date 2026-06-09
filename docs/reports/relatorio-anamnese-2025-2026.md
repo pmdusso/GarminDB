@@ -190,6 +190,76 @@ _Cada célula mensal é a **melhor** estimativa (máximo) do mês (o Garmin emit
 
 _Cobertura de potência: 603 pedais com dados nos arquivos de resumo._
 
+### Durabilidade aeróbica (desacoplamento FC:velocidade)
+
+EF = velocidade/FC; desacoplamento = (EF 1ª metade − 2ª metade)/EF 1ª metade, só em pedaladas outdoor ≥60 min estáveis (velocidade indoor é simulada). <5% forte · 5–10% moderado · >10% acima do limiar aeróbico.
+
+| Mês | Desacopl. médio | EF médio |
+|---|---|---|
+| 2025-01 | 12.8% | 0,204 |
+| 2025-02 | 13.5% | 0,205 |
+| 2025-03 | 10.8% | 0,215 |
+| 2025-04 | 8.3% | 0,215 |
+| 2025-05 | 7.3% | 0,208 |
+| 2025-06 | 7.8% | 0,206 |
+| 2025-07 | 12.0% | 0,204 |
+| 2025-08 | 6.5% | 0,198 |
+| 2025-09 | 11.1% | 0,208 |
+| 2025-10 | 15.6% | 0,204 |
+| 2025-11 | 17.9% | 0,218 |
+| 2025-12 | 9.4% | 0,212 |
+| 2026-01 | 9.8% | 0,217 |
+| 2026-02 | 4.4% | 0,204 |
+| 2026-03 | 7.4% | 0,206 |
+| 2026-04 | 7.1% | 0,217 |
+| 2026-05 | 9.0% | 0,199 |
+| 2026-06 | 11.8% | 0,197 |
+
+**Pedaladas recentes:**
+
+- 2026-06-07: desacoplamento 11.6% · EF 0.211
+- 2026-06-04: desacoplamento 12.0% · EF 0.183
+- 2026-05-30: desacoplamento 6.4% · EF 0.189
+
+_38 pedalada(s) elegível(is) descartada(s) por variabilidade alta._
+
+_190 pedalada(s) analisada(s); métrica válida para esforço estável sub-limiar; aquecimento e paradas removidos._
+
+### Durabilidade aeróbica (desacoplamento potência:FC)
+
+EF = potência/FC; desacoplamento = (EF 1ª metade − 2ª metade)/EF 1ª metade, em pedaladas ≥60 min com potência (indoor e outdoor — potência é medida). <5% forte · 5–10% moderado · >10% acima do limiar aeróbico.
+
+| Mês | Desacopl. médio | EF médio (W/bpm) |
+|---|---|---|
+| 2025-01 | 9.9% | 1,220 |
+| 2025-02 | 11.0% | 1,281 |
+| 2025-03 | 10.3% | 1,336 |
+| 2025-04 | 7.3% | 1,379 |
+| 2025-05 | 10.1% | 1,380 |
+| 2025-06 | 5.8% | 1,417 |
+| 2025-07 | 9.0% | 1,363 |
+| 2025-08 | 6.4% | 1,381 |
+| 2025-09 | 6.7% | 1,380 |
+| 2025-10 | 12.9% | 1,357 |
+| 2025-11 | 15.1% | 1,407 |
+| 2025-12 | 6.6% | 1,345 |
+| 2026-01 | 10.2% | 1,454 |
+| 2026-02 | 8.9% | 1,404 |
+| 2026-03 | 7.5% | 1,387 |
+| 2026-04 | 3.2% | 1,540 |
+| 2026-05 | 8.3% | 1,380 |
+| 2026-06 | 11.3% | 1,353 |
+
+**Pedaladas recentes:**
+
+- 2026-06-07 (outdoor): desacoplamento 8.9% · 158 W · EF 1.170
+- 2026-06-04 (outdoor): desacoplamento 13.7% · 233 W · EF 1.536
+- 2026-05-30 (outdoor): desacoplamento 3.6% · 171 W · EF 1.331
+
+_38 pedalada(s) outdoor descartada(s) por variabilidade alta._
+
+_205 pedalada(s) com potência; rides indoor entram sem porta de estabilidade; aquecimento removido._
+
 
 ## 4. Carga de treino, periodização e segurança da rampa
 
