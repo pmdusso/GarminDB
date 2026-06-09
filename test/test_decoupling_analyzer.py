@@ -1,0 +1,145 @@
+"""Tests for the Hr:speed aerobic-decoupling analyzer (SP2a).
+
+Synthetic garmin_activities.db with per-second activity_records. Rides are built
+deterministically so the efficiency-factor / decoupling math is exact: warmup is
+trimmed (first 600 s), so the analysed window is [600 s, T); the HR break is
+placed at the analysed midpoint, giving a known first-vs-second EF ratio.
+"""
+
+import os
+import sqlite3
+from datetime import date, datetime, timedelta
+
+from garmindb.analysis.decoupling_analyzer import (
+    DecouplingAnalyzer, DecouplingResult, _ef,
+)
+
+
+def _db(tmp_path):
+    con = sqlite3.connect(os.path.join(str(tmp_path), "garmin_activities.db"))
+    con.execute(
+        "CREATE TABLE activities (activity_id TEXT, start_time TEXT, sport TEXT, "
+        "sub_sport TEXT, moving_time TEXT, distance FLOAT)")
+    con.execute(
+        "CREATE TABLE activity_records (activity_id TEXT, record INTEGER, "
+        "timestamp TEXT, hr INTEGER, speed FLOAT, position_lat FLOAT)")
+    return con
+
+
+def _hms(seconds):
+    h = seconds // 3600
+    m = (seconds % 3600) // 60
+    s = seconds % 60
+    return f"{h:02d}:{m:02d}:{s:02d}.000000"
+
+
+def _add_ride(con, aid, day, *, minutes=70, sub_sport="generic", gps=True,
+              hr_fn=None, speed_fn=None):
+    """Insert one ride: activities row + per-second records (1 Hz)."""
+    secs = minutes * 60
+    start = datetime(day.year, day.month, day.day, 9, 0, 0)
+    con.execute(
+        "INSERT INTO activities VALUES (?,?,?,?,?,?)",
+        (str(aid), start.strftime("%Y-%m-%d %H:%M:%S"), "cycling", sub_sport,
+         _hms(secs), 35.0))
+    hr_fn = hr_fn or (lambda e, t: 145)
+    speed_fn = speed_fn or (lambda e, t: 30.0)
+    rows = []
+    for i in range(secs):
+        ts = (start + timedelta(seconds=i)).strftime("%Y-%m-%d %H:%M:%S")
+        lat = -30.05 if gps else None
+        rows.append((str(aid), i, ts, hr_fn(i, secs), speed_fn(i, secs), lat))
+    con.executemany("INSERT INTO activity_records VALUES (?,?,?,?,?,?)", rows)
+    con.commit()
+
+
+def _ramp_hr(low, high):
+    """HR = low before the analysed midpoint, high after (warmup=600 s trimmed)."""
+    def fn(e, total):
+        mid = 600 + (total - 600) / 2.0
+        return low if e < mid else high
+    return fn
+
+
+# --------------------------------------------------------------------------- #
+# Pure-math helpers
+# --------------------------------------------------------------------------- #
+
+def test_ef_helper():
+    assert _ef([(140, 28.0), (140, 32.0)]) == 30.0 / 140
+    assert _ef([]) is None
+    assert _ef([(0, 30.0)]) is None
+
+
+def test_decoupling_math_exact():
+    # speed 30 constant; HR 140 then 160 at the analysed midpoint.
+    # ef1=30/140, ef2=30/160 -> decoupling = (160-140)/160 = 12.5%.
+    samples = [(e, 140.0 if e < 2400 else 160.0, 30.0)
+               for e in range(600, 4200)]
+    ef1, ef2, dc, ef_all, cv = DecouplingAnalyzer._decoupling(samples)
+    assert abs(dc - 12.5) < 0.2
+    assert cv == 0.0
+    assert ef1 > ef2
+
+
+# --------------------------------------------------------------------------- #
+# Full analyze() over a synthetic DB
+# --------------------------------------------------------------------------- #
+
+def test_outdoor_steady_ride_decoupling(tmp_path):
+    con = _db(tmp_path)
+    _add_ride(con, 1, date(2026, 5, 20), hr_fn=_ramp_hr(140, 160))
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze(date(2026, 1, 1),
+                                                  date(2026, 6, 7))
+    assert isinstance(r, DecouplingResult)
+    assert r.eligible_count == 1 and r.analyzed_count == 1
+    ride = r.rides[0]
+    assert abs(ride.decoupling_pct - 12.5) < 0.3
+    assert ride.steady is True
+    assert ride.ef_first > ride.ef_second
+
+
+def test_indoor_and_short_and_nogps_excluded(tmp_path):
+    con = _db(tmp_path)
+    _add_ride(con, 1, date(2026, 5, 20), sub_sport="indoor_cycling")  # indoor
+    _add_ride(con, 2, date(2026, 5, 21), sub_sport="virtual_activity")  # virtual
+    _add_ride(con, 3, date(2026, 5, 22), minutes=30)                   # too short
+    _add_ride(con, 4, date(2026, 5, 23), gps=False)                    # no GPS
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze(date(2026, 1, 1),
+                                                  date(2026, 6, 7))
+    assert r.eligible_count == 0
+    assert r.rides == []
+
+
+def test_unsteady_ride_gated_out(tmp_path):
+    con = _db(tmp_path)
+    # Speed alternates 10/50 (mean 30, cv ~0.67) -> fails the steadiness gate.
+    _add_ride(con, 1, date(2026, 5, 20),
+              speed_fn=lambda e, t: 10.0 if (e // 1) % 2 == 0 else 50.0)
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze(date(2026, 1, 1),
+                                                  date(2026, 6, 7))
+    assert r.eligible_count == 1
+    assert r.analyzed_count == 0
+    assert r.skipped_unsteady == 1
+    assert r.rides == []
+
+
+def test_positive_insight_for_low_decoupling(tmp_path):
+    con = _db(tmp_path)
+    _add_ride(con, 1, date(2026, 5, 20), hr_fn=_ramp_hr(140, 145))  # ~3.4%
+    con.close()
+    r = DecouplingAnalyzer(str(tmp_path)).analyze(date(2026, 1, 1),
+                                                  date(2026, 6, 7))
+    assert r.rides[0].decoupling_pct < 5.0
+    assert any(i.severity.value == "positive" for i in r.insights)
+    # monthly trend carries the May bucket.
+    assert ("2026-05", r.rides[0].decoupling_pct) in r.monthly_decoupling
+
+
+def test_empty_db_is_safe(tmp_path):
+    r = DecouplingAnalyzer(str(tmp_path)).analyze(date(2026, 1, 1),
+                                                  date(2026, 6, 7))
+    assert r.eligible_count == 0 and r.rides == [] and r.insights == []
