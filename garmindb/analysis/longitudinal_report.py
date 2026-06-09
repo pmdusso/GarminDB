@@ -318,6 +318,7 @@ class LongitudinalReportBuilder:
         )
         series["vo2max_cycling"] = self._vo2max_series("cycle_activities")
         series["vo2max_running"] = self._vo2max_series("steps_activities")
+        series["anaerobic_te"] = self._anaerobic_te_series()
         series["ctl"] = self._ctl_series(load_months)
 
         red_flags = self._screen(series, acwr, monotony, ramp,
@@ -765,6 +766,38 @@ class LongitudinalReportBuilder:
             (ym, round(monthly[ym], 0) if ym in monthly else None)
             for ym in _month_keys(self._start, self._end)
         ]
+        return s
+
+    def _anaerobic_te_series(self) -> MetricSeries:
+        """Monthly MEAN anaerobic Training Effect (0-5) across activities.
+
+        Unlike VO2max (best estimate per month), anaerobic TE is a per-session
+        high-intensity dose, so the monthly mean is the meaningful summary.
+        """
+        rows = self._query(
+            "garmin_activities.db",
+            "SELECT start_time, anaerobic_training_effect FROM activities "
+            "WHERE anaerobic_training_effect IS NOT NULL "
+            "AND date(start_time) >= ? AND date(start_time) <= ?",
+            (self._start.isoformat(), self._end.isoformat()),
+        )
+        monthly: Dict[str, List[float]] = {}
+        for ts, v in rows:
+            day = _parse_date(ts)
+            if day is None or v is None:
+                continue
+            monthly.setdefault(_ym(day), []).append(float(v))
+        s = MetricSeries(
+            key="anaerobic_te", label="Training Effect anaeróbico",
+            unit="", better="neutral", decimals=1)
+        s.points = [
+            (ym, round(sum(monthly[ym]) / len(monthly[ym]), 4)
+             if ym in monthly else None)
+            for ym in _month_keys(self._start, self._end)
+        ]
+        n = sum(len(v) for v in monthly.values())
+        s.note = (f"{n} atividades com TE anaeróbico; escala 0–5 (estímulo de "
+                  "alta intensidade), complementa o TE aeróbico") if n else None
         return s
 
     # -- series helpers ----------------------------------------------------- #

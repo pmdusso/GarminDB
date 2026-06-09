@@ -193,3 +193,25 @@ def test_respiration_series_and_renders_with_spo2(tmp_path):
     assert rr.note is not None and "dias medidos" in rr.note
     md = LongitudinalPresenter().render(report)
     assert "FR repouso (rpm)" in md
+
+
+# --------------------------------------------------------------------------- #
+# Anaerobic Training Effect
+# --------------------------------------------------------------------------- #
+
+def test_anaerobic_te_monthly_mean_and_render(tmp_path):
+    _write_garmin_db(str(tmp_path))
+    _write_activities_db(str(tmp_path), [
+        {"id": 1, "day": "2025-02-05", "anaerobic_te": 2.0},
+        {"id": 2, "day": "2025-02-20", "anaerobic_te": 4.0},   # Feb mean = 3.0
+        {"id": 3, "day": "2025-03-10", "anaerobic_te": 1.0},
+    ])
+    _write_monitoring_db(str(tmp_path), {})
+    report = _builder(tmp_path, date(2025, 1, 1), date(2025, 3, 31)).build()
+    te = report.series["anaerobic_te"]
+    assert dict(te.points)["2025-02"] == 3.0
+    assert dict(te.points)["2025-03"] == 1.0
+    assert dict(te.points)["2025-01"] is None    # no activity -> gap, not zero
+    assert te.note is not None and "3 atividades" in te.note
+    md = LongitudinalPresenter().render(report)
+    assert "anaeróbico" in md

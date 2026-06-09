@@ -314,14 +314,18 @@ class LongitudinalPresenter:
             "Confirma adaptação ao treino e serve de eixo objetivo para "
             "interpretar a fadiga. VO2max é **estimativa do Garmin** (tendência, "
             "não precisão).\n")
-        for key in ("vo2max_cycling", "vo2max_running"):
+        for key in ("vo2max_cycling", "vo2max_running", "anaerobic_te"):
             lines.append(self._metric_summary_line(r.series.get(key)))
         lines.append("")
         lines.append(self._months_table(
             r,
             [("VO2max ciclismo", r.series.get("vo2max_cycling"), 0),
-             ("VO2max corrida", r.series.get("vo2max_running"), 0)],
+             ("VO2max corrida", r.series.get("vo2max_running"), 0),
+             ("TE anaeróbico", r.series.get("anaerobic_te"), 1)],
         ))
+        te = r.series.get("anaerobic_te")
+        if te and te.note:
+            lines.append(f"\n_{te.note}._")
         lines.append("\n_Cada célula mensal é a **melhor** estimativa (máximo) do mês "
                      "(o Garmin emite uma estimativa por atividade); '—' = sem leitura "
                      "no mês. As demais séries do relatório usam médias mensais._")
