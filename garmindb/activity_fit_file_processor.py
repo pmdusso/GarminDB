@@ -59,26 +59,37 @@ class ActivityFitFileProcessor(FitFileProcessor):
         for record_num, message in enumerate(messages):
             self._write_record_entry(fit_file, message.fields, record_num)
 
+    @staticmethod
+    def _record_dict(fit_file, message_fields, record_num, activity_id):
+        """Build the activity_records row for one per-second record message.
+
+        Pure (no DB/session) so the field mapping is unit-testable. A ride with
+        no power meter yields power=None (message_fields.get('power') is None),
+        which imports as NULL silently.
+        """
+        return {
+            'activity_id'                       : activity_id,
+            'record'                            : record_num,
+            'timestamp'                         : fit_file.utc_datetime_to_local(message_fields.timestamp),
+            'position_lat'                      : message_fields.get('position_lat'),
+            'position_long'                     : message_fields.get('position_long'),
+            'distance'                          : message_fields.get('distance'),
+            'cadence'                           : message_fields.get('cadence'),
+            'hr'                                : message_fields.get('heart_rate'),
+            'rr'                                : message_fields.get('respiration_rate'),
+            'altitude'                          : message_fields.get('altitude'),
+            'speed'                             : message_fields.get('speed'),
+            'power'                             : message_fields.get('power'),
+            'temperature'                       : message_fields.get('temperature'),
+        }
+
     def _write_record_entry(self, fit_file, message_fields, record_num):
         # We don't get record data from multiple sources so we don't need to coellesce data in the DB.
         # It's fastest to just write the new data out if it doesn't currently exist.
         activity_id = File.id_from_path(fit_file.filename)
         plugin_record = self._plugin_dispatch('write_record_entry', self.garmin_act_db_session, fit_file, activity_id, message_fields, record_num)
         if not ActivityRecords.s_exists(self.garmin_act_db_session, {'activity_id' : activity_id, 'record' : record_num}):
-            record = {
-                'activity_id'                       : activity_id,
-                'record'                            : record_num,
-                'timestamp'                         : fit_file.utc_datetime_to_local(message_fields.timestamp),
-                'position_lat'                      : message_fields.get('position_lat'),
-                'position_long'                     : message_fields.get('position_long'),
-                'distance'                          : message_fields.get('distance'),
-                'cadence'                           : message_fields.get('cadence'),
-                'hr'                                : message_fields.get('heart_rate'),
-                'rr'                                : message_fields.get('respiration_rate'),
-                'altitude'                          : message_fields.get('altitude'),
-                'speed'                             : message_fields.get('speed'),
-                'temperature'                       : message_fields.get('temperature'),
-            }
+            record = self._record_dict(fit_file, message_fields, record_num, activity_id)
             record.update(plugin_record)
             root_logger.debug("_write_record_entry activity_id %s, record %s doesn't exist", activity_id, record_num)
             self.garmin_act_db_session.add(ActivityRecords(**record))
