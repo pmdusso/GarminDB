@@ -21,6 +21,12 @@ logger = logging.getLogger(__name__)
 # Durations (seconds) shown on the power curve.
 CURVE_DURATIONS = [5, 60, 300, 1200, 3600]
 
+# Moderate publication-gate thresholds (user decision 2026-06-09).
+GATE_RECENCY_DAYS = 42        # 6 weeks
+GATE_MIN_CANDIDATES = 3       # >=3 rides carrying maxAvgPower_1200 in window
+GATE_MIN_IF = 0.90           # IF = normPower / configured FTP
+EFTP_MULTIPLIER = 0.95       # best 20-min * 0.95
+
 CYCLING_TYPES = {
     "cycling", "virtual_ride", "road_biking", "indoor_cycling",
     "gravel_cycling", "mountain_biking",
@@ -50,9 +56,23 @@ class PowerRide:
     power_time_in_zone: Dict[int, float]  # zone (1..7) -> seconds
     is_indoor: bool = False               # trainer/virtual vs outdoor power-meter
     duration_s: Optional[float] = None    # timer seconds (NP>=30min gate)
-    exclude: bool = False                 # excludeFromPowerCurveReports / sanity;
-    # consumed by the indoor/outdoor curves in Task 2 (the legacy all-rides curve
-    # intentionally keeps excluded rides so its values stay back-compatible).
+    # Set by excludeFromPowerCurveReports or the sanity check below. NOTE: the
+    # legacy all-rides curve (power_curve_recent/alltime) intentionally stays
+    # unfiltered for back-compat; only the indoor/outdoor curves filter this.
+    exclude: bool = False
+
+
+@dataclass
+class PowerGate:
+    """Verdict of the eFTP publication gate (data-honesty for a clinician)."""
+
+    published: bool
+    source_env: Optional[str]            # "outdoor" | "indoor" | None
+    candidate_count: int                 # qualifying rides in the recency window
+    recency_ok: bool
+    if_ok: bool
+    newest_effort_date: Optional[date]
+    reason: str                          # human-readable verdict (pt-BR)
 
 
 @dataclass
@@ -72,11 +92,15 @@ class PowerAnalysisResult:
     total_rides: int
     ftp_needs_test: bool
     skipped_files: int = 0                 # corrupt/unreadable JSONs ignored
-    curve_indoor: Dict[int, float] = field(default_factory=dict)
-    curve_outdoor: Dict[int, float] = field(default_factory=dict)
+    curve_indoor: Dict[int, float] = field(default_factory=dict)   # all-time
+    curve_outdoor: Dict[int, float] = field(default_factory=dict)  # all-time
     eftp_indoor: Optional[float] = None    # indoor best-20 * 0.95 (ungated)
     eftp_outdoor: Optional[float] = None   # outdoor best-20 * 0.95 (ungated)
-    peak_5s: Optional[float] = None        # best maxAvgPower_5 (neuromuscular)
+    peak_5s: Optional[float] = None        # all-time best maxAvgPower_5 (neuromuscular)
+    gate: Optional["PowerGate"] = None
+    eftp_measured: Optional[float] = None  # gated headline eFTP
+    eftp_source: Optional[str] = None      # "outdoor" | "indoor" | None
+    eftp_date: Optional[date] = None       # date of the qualifying 20-min effort
     insights: List[Insight] = field(default_factory=list)
 
 
@@ -200,6 +224,53 @@ class PowerAnalyzer:
             return {}
         return {z: round(secs / grand * 100, 1) for z, secs in sorted(totals.items())}
 
+    def _gate_env(
+        self, rides_env: List["PowerRide"], end_date: date, env: str,
+    ) -> Tuple["PowerGate", Optional[float], Optional[date]]:
+        """Evaluate the moderate publication gate for one environment.
+
+        Returns the verdict plus (eftp, eftp_date) when it publishes.
+        """
+        window_start = end_date - timedelta(days=GATE_RECENCY_DAYS)
+        candidates = [
+            r for r in rides_env
+            if not r.exclude and 1200 in r.peak_power
+            and window_start <= r.date <= end_date
+        ]
+        count = len(candidates)
+        newest = max((r.date for r in candidates), default=None)
+        recency_ok = newest is not None
+        # IF = NP / configured FTP on at least one candidate (a genuinely hard
+        # near-threshold block). Needs a configured FTP to anchor IF.
+        if_ok = bool(self._ftp) and any(
+            r.norm_power and (r.norm_power / self._ftp) >= GATE_MIN_IF
+            for r in candidates
+        )
+        published = count >= GATE_MIN_CANDIDATES and recency_ok and if_ok
+        eftp = eftp_date = None
+        if published:
+            best = max(candidates, key=lambda r: r.peak_power[1200])
+            eftp = round(best.peak_power[1200] * EFTP_MULTIPLIER)
+            eftp_date = best.date
+            reason = (f"eFTP medido {env}: melhor 20-min x {EFTP_MULTIPLIER:g}, "
+                      f"{count} pedais na janela de {GATE_RECENCY_DAYS} dias")
+        else:
+            bits = []
+            if count < GATE_MIN_CANDIDATES:
+                bits.append(f"{count}<{GATE_MIN_CANDIDATES} pedais com 20-min")
+            if not recency_ok:
+                bits.append(f"sem esforco nos ultimos {GATE_RECENCY_DAYS} dias")
+            if not if_ok:
+                bits.append("sem esforco duro (IF<0,90)")
+            reason = ("FTP configurado (nao testado nestes dados: "
+                      + "; ".join(bits) + ")")
+        gate = PowerGate(
+            published=published, source_env=(env if published else None),
+            candidate_count=count, recency_ok=recency_ok, if_ok=if_ok,
+            newest_effort_date=newest, reason=reason,
+        )
+        return gate, eftp, eftp_date
+
     def analyze(self, start_date: date, end_date: date) -> "PowerAnalysisResult":
         """Build a PowerAnalysisResult for the period.
 
@@ -231,6 +302,20 @@ class PowerAnalyzer:
         peak_5s = max((r.peak_power[5] for r in usable if 5 in r.peak_power),
                       default=None)
 
+        out_gate, out_eftp, out_date = self._gate_env(outdoor, end_date, "outdoor")
+        in_gate, in_eftp, in_date = self._gate_env(indoor, end_date, "indoor")
+        if out_gate.published:
+            gate, eftp_measured, eftp_source, eftp_date = \
+                out_gate, out_eftp, "outdoor", out_date
+        elif in_gate.published:
+            gate, eftp_measured, eftp_source, eftp_date = \
+                in_gate, in_eftp, "indoor", in_date
+        else:
+            # Neither published: surface the outdoor verdict if outdoor rides
+            # exist, else the indoor verdict (so the reason is the relevant one).
+            gate = out_gate if outdoor else in_gate
+            eftp_measured = eftp_source = eftp_date = None
+
         result = PowerAnalysisResult(
             period_start=start_date,
             period_end=end_date,
@@ -250,6 +335,10 @@ class PowerAnalyzer:
             eftp_indoor=eftp_indoor,
             eftp_outdoor=eftp_outdoor,
             peak_5s=peak_5s,
+            gate=gate,
+            eftp_measured=eftp_measured,
+            eftp_source=eftp_source,
+            eftp_date=eftp_date,
         )
         logger.debug(
             "Power analysis %s..%s: %d ride(s) total, %d recent with power, "
