@@ -365,5 +365,6 @@ def test_phase0_full_render_smoke(tmp_path):
                    "média semanal", "Status VFC", "recarga noturna",
                    "Arquitetura do sono", "FC máx operacional"):
         assert needle in md, f"missing: {needle}"
-    # Data-honesty: still no power data, FTP still a configured goal.
-    assert "Não há dados de potência" in md
+    # Data-honesty: Phase 1 removed the falsehood; honest configured-goal fallback.
+    assert "Não há dados de potência" not in md   # Phase 1 removed the falsehood
+    assert "configurad" in md.lower()              # honest configured-goal fallback

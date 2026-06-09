@@ -77,6 +77,8 @@ def main():
         )
 
         db_dir = db_params.db_path
+        import os
+        acts_dir = os.path.join(os.path.dirname(db_dir), "FitFiles", "Activities")
         end = args.end or date.today()
         # Default span: all of the prior calendar year through today, so the
         # report always spans at least one full year plus the current YTD.
@@ -87,6 +89,7 @@ def main():
         builder = LongitudinalReportBuilder(
             db_dir=db_dir, targets=targets,
             start_date=start, end_date=end, generated_at=generated,
+            activities_dir=acts_dir,
         )
         report = builder.build()
         markdown = LongitudinalPresenter(

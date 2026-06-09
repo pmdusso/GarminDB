@@ -5,7 +5,8 @@ Layout follows sports-medicine anamnesis norms: lead with an executive panel
 block, then one section per metric family with a unicode sparkline, a
 months-as-rows table of the real numbers, and a short interpretation. A closing
 provenance/limitations section states that the values are Garmin device
-estimates (screening, not diagnostic) and that no power data exists.
+estimates (screening, not diagnostic). Power, when a recent qualifying effort
+exists, is shown as a gated eFTP (else the configured FTP, labelled as a goal).
 """
 
 import logging
@@ -126,7 +127,7 @@ class LongitudinalPresenter:
             f"race: {r.targets.race_name or ''}\n"
             f"race_date: {r.targets.race_date or ''}\n"
             "data_source: garmin_connect\n"
-            "data_caveat: valores são estimativas de dispositivo (triagem, não diagnóstico); sem dados de potência\n"
+            "data_caveat: valores são estimativas de dispositivo (triagem, não diagnóstico); potência só quando há esforço qualificado (senão meta configurada)\n"
             "---\n"
         )
 
@@ -357,26 +358,44 @@ class LongitudinalPresenter:
 
     def _power_caveat(self, r: LongitudinalReport) -> str:
         t = r.targets
-        wkg = None
-        if t.ftp_watts and r.current_weight:
-            wkg = t.ftp_watts / r.current_weight
-        body = [
-            "\n### Potência (FTP / W·kg) — somente metas configuradas\n",
-            "> ⚠️ **Não há dados de potência** nas bases (nenhum medidor sincronizou "
-            "watts). Os números abaixo são **metas configuradas pelo atleta**, não "
-            "medições, e não podem ser verificados a partir destes dados.\n",
-        ]
+        power = getattr(r, "power", None)
+        wkg_cfg = (t.ftp_watts / r.current_weight
+                   if t.ftp_watts and r.current_weight else None)
+        body = ["\n### Potência (FTP / W·kg)\n"]
+        published = bool(power and getattr(power, "gate", None)
+                         and power.gate.published and power.eftp_measured)
+        if published:
+            src = ("outdoor" if power.eftp_source == "outdoor"
+                   else "indoor (~8–12% abaixo do outdoor)")
+            body.append(
+                f"- **eFTP medido:** {power.eftp_measured:.0f} W (fonte {src}; "
+                f"melhor 20-min × 0,95, {power.gate.candidate_count} pedais na "
+                "janela de 6 semanas). Estimativa de campo, não teste de "
+                "laboratório.")
+            if r.current_weight:
+                body.append(
+                    f"- W·kg medido ≈ {power.eftp_measured / r.current_weight:.2f} "
+                    f"(eFTP ÷ peso atual {r.current_weight:.1f} kg, mediana recente — "
+                    "o eFTP está dentro da janela de 6 semanas, então o peso é "
+                    "contemporâneo)")
+        else:
+            reason = (power.gate.reason if power and getattr(power, "gate", None)
+                      else "dados de potência indisponíveis")
+            body.append(
+                "> ⚠️ Sem eFTP **medido** publicável neste período "
+                f"({reason}). O número abaixo é **meta configurada**, não medição.")
         if t.ftp_watts:
             body.append(f"- FTP configurado: **{_num(t.ftp_watts, 0)} W** "
                         "(autorrelato / teste externo)")
-        if wkg:
-            body.append(f"- W·kg estimado = FTP configurado ÷ peso atual "
-                        f"({_num(r.current_weight, 1)} kg) = **{_num(wkg, 2)} W/kg** "
+        if wkg_cfg:
+            body.append(f"- W·kg configurado = {_num(t.ftp_watts, 0)} ÷ "
+                        f"{_num(r.current_weight, 1)} kg = **{_num(wkg_cfg, 2)} W/kg** "
                         f"(meta {_num(t.wkg_target, 1)})")
         if t.weight_target_kg:
             body.append(f"- Peso-alvo de prova: {_num(t.weight_target_kg, 0)} kg")
-        body.append("\nPara potência real, registrar com medidor (pedal/cubo) ou teste "
-                    "laboratorial; VO2max acima é a melhor proxy disponível aqui.")
+        if power and getattr(power, "total_rides", 0):
+            body.append(f"\n_Cobertura de potência: {power.total_rides} pedais "
+                        "com dados nos arquivos de resumo._")
         return "\n".join(body)
 
     def _load(self, r: LongitudinalReport) -> str:
@@ -384,7 +403,7 @@ class LongitudinalPresenter:
         lines.append(
             "CTL = fitness (carga crônica 42d), ATL = fadiga (aguda 7d), "
             "TSB = forma (CTL−ATL). Carga derivada do `training_load` do Garmin "
-            "(proxy de TSS; sem potência).\n")
+            "(proxy de TSS; carga não ponderada por potência).\n")
         ctl = r.series.get("ctl")
         if ctl:
             lines.append(self._metric_summary_line(ctl))
@@ -512,8 +531,10 @@ class LongitudinalPresenter:
             "estresse e Body Battery são estimativas do sensor óptico de pulso Garmin "
             "(não CPET laboratorial, ECG ou chest-strap). Use como **triagem/tendência**; "
             "confirmar com exames quando um sinal justificar.\n"
-            "- **Sem dados de potência.** Nenhuma atividade registrou watts; FTP e W·kg são "
-            "metas configuradas, não medições.\n"
+            "- **Potência** vem dos arquivos de resumo do Garmin (não das tabelas "
+            "do DB); um eFTP só é publicado quando há esforço recente suficiente "
+            "(gate de 6 semanas / IF≥0,90 / ≥3 pedais), senão mostra-se a FTP "
+            "configurada rotulada como meta.\n"
             "- **VFC** = média noturna (rMSSD) do `monitoring_hrv_status`; a tabela `hrv` "
             "está vazia.\n"
             "- **Peso** é esparso (pesagens irregulares) — tendência direcional, não granular.\n"

@@ -261,10 +261,10 @@ class PowerAnalyzer:
             if count < GATE_MIN_CANDIDATES:
                 bits.append(f"{count}<{GATE_MIN_CANDIDATES} pedais com 20-min")
             if not recency_ok:
-                bits.append(f"sem esforco nos ultimos {GATE_RECENCY_DAYS} dias")
+                bits.append(f"sem esforço nos últimos {GATE_RECENCY_DAYS} dias")
             if not if_ok:
-                bits.append("sem esforco duro (IF<0,90)")
-            reason = ("FTP configurado (nao testado nestes dados: "
+                bits.append("sem esforço duro (IF<0,90)")
+            reason = ("FTP configurado (não testado nestes dados: "
                       + "; ".join(bits) + ")")
         gate = PowerGate(
             published=published, source_env=(env if published else None),

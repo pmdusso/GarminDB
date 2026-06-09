@@ -346,8 +346,9 @@ def test_renderer_smoke_and_power_caveat(tmp_path):
     assert "Painel clínico" in md
     assert "Sinais de alerta" in md
     assert "Procedência e limitações" in md
-    # Data-honesty: no power data, FTP labelled as configured goal.
-    assert "Não há dados de potência" in md
+    # Data-honesty: Phase 1 removed the falsehood; honest configured-goal fallback.
+    assert "Não há dados de potência" not in md   # Phase 1 removed the falsehood
+    assert "configurad" in md.lower()              # honest configured-goal fallback
     assert "325 W" in md
     assert "masculino" in md       # sex translated
 

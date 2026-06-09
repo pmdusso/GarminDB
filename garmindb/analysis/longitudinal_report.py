@@ -7,8 +7,9 @@ training totals, rolling baselines, and a rule-based red-flag screen. The target
 reader is a sports-medicine clinician doing an anamnesis (longitudinal review).
 
 Data-honesty notes (these matter -- the output goes to a doctor):
-- There is NO power-meter data in these DBs. FTP / W-kg are CONFIGURED goals
-  (``performance_targets.json``), not measurements, and are labelled as such.
+- Power lives in the per-activity summary JSONs (not the DBs); a moderate
+  publication gate decides whether to show a MEASURED eFTP or fall back to the
+  configured FTP labelled as such (see :class:`PowerAnalyzer`).
 - CTL/ATL/TSB use Garmin per-activity ``training_load`` as the load proxy and the
   same EWMA windows (ATL 7d, CTL 42d) as :class:`ActivityAnalyzer`, so the numbers
   stay consistent with the other reports.
@@ -237,6 +238,7 @@ class LongitudinalReport:
     hrv_status_latest: Optional[str]
     hrv_status_balanced_pct: Optional[float]
     operational_max_hr: Dict[str, Optional[int]]
+    power: object = None        # PowerAnalysisResult | None (avoid import cycle)
 
 
 # --------------------------------------------------------------------------- #
@@ -262,12 +264,14 @@ class LongitudinalReportBuilder:
         start_date: date,
         end_date: date,
         generated_at: datetime,
+        activities_dir: Optional[str] = None,
     ):
         self._db_dir = db_dir
         self._targets = targets
         self._start = start_date
         self._end = end_date
         self._generated = generated_at
+        self._acts_dir = activities_dir
 
     # -- public ------------------------------------------------------------- #
 
@@ -357,6 +361,7 @@ class LongitudinalReportBuilder:
         days = self._days_to_race()
         hrv_status_latest, hrv_status_balanced = self._hrv_status()
         operational_max_hr = self._operational_max_hr()
+        power = self._power()
 
         return LongitudinalReport(
             generated_at=self._generated,
@@ -384,6 +389,7 @@ class LongitudinalReportBuilder:
             hrv_status_latest=hrv_status_latest,
             hrv_status_balanced_pct=hrv_status_balanced,
             operational_max_hr=operational_max_hr,
+            power=power,
         )
 
     # -- db access ---------------------------------------------------------- #
@@ -1176,6 +1182,19 @@ class LongitudinalReportBuilder:
         return "🟢", "métricas dentro das faixas pessoais habituais"
 
     # -- misc --------------------------------------------------------------- #
+
+    def _power(self):
+        """Run PowerAnalyzer over the summary JSONs (None if no dir/data)."""
+        if not self._acts_dir:
+            return None
+        from .power_analyzer import PowerAnalyzer
+        try:
+            return PowerAnalyzer(
+                self._acts_dir, self._targets.ftp_watts,
+            ).analyze(self._start, self._end)
+        except Exception as e:  # never let power break the clinical report
+            logger.warning("Longitudinal power analysis failed: %s", e)
+            return None
 
     def _days_to_race(self) -> Optional[int]:
         if not self._targets.race_date:
