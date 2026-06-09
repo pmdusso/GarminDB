@@ -26,6 +26,17 @@ CYCLING_TYPES = {
     "gravel_cycling", "mountain_biking",
 }
 
+# Indoor detection: explicit indoor sport types OR a trainer-app manufacturer.
+# GPS presence does NOT separate them (TACX rides carry simulated GPS).
+_INDOOR_TYPES = {"indoor_cycling", "virtual_ride"}
+_INDOOR_MANUFACTURERS = {"TACX", "THE_SUFFERFEST", "TRAINER_ROAD", "VIRTUALTRAINING"}
+
+
+def _is_indoor(type_key: str, manufacturer) -> bool:
+    if type_key in _INDOOR_TYPES:
+        return True
+    return str(manufacturer or "").upper() in _INDOOR_MANUFACTURERS
+
 
 @dataclass
 class PowerRide:
@@ -37,6 +48,11 @@ class PowerRide:
     norm_power: Optional[float]
     peak_power: Dict[int, float]          # duration_s -> best avg watts
     power_time_in_zone: Dict[int, float]  # zone (1..7) -> seconds
+    is_indoor: bool = False               # trainer/virtual vs outdoor power-meter
+    duration_s: Optional[float] = None    # timer seconds (NP>=30min gate)
+    exclude: bool = False                 # excludeFromPowerCurveReports / sanity;
+    # consumed by the indoor/outdoor curves in Task 2 (the legacy all-rides curve
+    # intentionally keeps excluded rides so its values stay back-compatible).
 
 
 @dataclass
@@ -107,13 +123,25 @@ class PowerAnalyzer:
         except ValueError:
             return None
 
+        avg = data.get("avgPower")
+        best20 = peak.get(1200)
+        # Sanity: a 20-min best below the whole-ride average is impossible
+        # (malformed export). Honor Garmin's own exclude flag too.
+        exclude = bool(data.get("excludeFromPowerCurveReports"))
+        if avg is not None and best20 is not None and float(best20) < float(avg):
+            exclude = True
+
         return PowerRide(
             date=ride_date,
             sport=sport,
-            avg_power=data.get("avgPower"),
+            avg_power=avg,
             norm_power=data.get("normPower"),
             peak_power=peak,
             power_time_in_zone=zones,
+            is_indoor=_is_indoor(sport, data.get("manufacturer")),
+            duration_s=(float(data["duration"])
+                        if data.get("duration") is not None else None),
+            exclude=exclude,
         )
 
     def _best_curve(self, rides: List["PowerRide"]) -> Dict[int, float]:
