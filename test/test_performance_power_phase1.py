@@ -10,7 +10,8 @@ from garmindb.presentation.markdown.performance_renderer import (
 
 
 def _power_with_eftp():
-    gate = PowerGate(published=True, source_env="outdoor", candidate_count=3,
+    # published is a derived @property: candidate_count>=3 + recency_ok + if_ok.
+    gate = PowerGate(source_env="outdoor", candidate_count=3,
                      recency_ok=True, if_ok=True,
                      newest_effort_date=date(2026, 5, 27),
                      reason="eFTP medido outdoor")
@@ -36,6 +37,56 @@ def test_renderer_shows_both_ftps_gap_wkg_and_zones():
     assert "outdoor" in md
     assert "Zonas de potência" in md         # zone distribution surfaced (was dropped)
     assert "Gap vs configurado: -35 W" in md  # 290 - 325 = -35
+
+
+def _power_gate_declined():
+    # candidate_count < 3 -> published property is False (gate declines).
+    gate = PowerGate(source_env=None, candidate_count=1, recency_ok=True,
+                     if_ok=False, newest_effort_date=date(2026, 5, 27),
+                     reason="FTP configurado (não testado nestes dados: "
+                            "1<3 pedais com 20-min; sem esforço duro (IF<0,90))")
+    return PowerAnalysisResult(
+        period_start=date(2026, 1, 1), period_end=date(2026, 6, 7),
+        configured_ftp=325, estimated_ftp=None, best_20min_recent=None,
+        best_20min_alltime=None, power_curve_recent={},
+        power_curve_alltime={1200: 290}, power_zone_distribution={},
+        recent_ride_count=2, total_rides=5, ftp_needs_test=False,
+        curve_outdoor={1200: 290}, curve_indoor={},
+        gate=gate, eftp_measured=None, eftp_source=None, eftp_date=None,
+    )
+
+
+def test_render_power_block_gate_declined_is_honest():
+    # The data-honesty headline path: no published eFTP -> show the configured
+    # FTP labelled as such + the gate reason, and NEVER a measured number/W·kg.
+    md = PerformancePresenter.render_power_block(_power_gate_declined(),
+                                                 wkg_measured=None)
+    assert "FTP configurado" in md and "325" in md
+    assert "não publicado" in md                 # decline branch rendered
+    assert "1<3 pedais" in md                     # the gate reason is surfaced
+    assert "W·kg medido" not in md                # no fabricated measured W/kg
+    assert "eFTP medido: 2" not in md             # no bare measured eFTP number
+
+
+def test_gate_published_is_derived_not_stored():
+    # published reflects the gate conditions; flipping if_ok flips published.
+    pub = PowerGate(source_env="outdoor", candidate_count=3, recency_ok=True,
+                    if_ok=True, newest_effort_date=date(2026, 5, 27), reason="x")
+    assert pub.published is True
+    declined = PowerGate(source_env=None, candidate_count=3, recency_ok=True,
+                         if_ok=False, newest_effort_date=None, reason="x")
+    assert declined.published is False
+
+
+def test_dc_label_boundaries():
+    # Pin the strong/moderate/high thresholds at exactly 5.0% and 10.0% so an
+    # off-by-one (< vs <=) can't silently misclassify a clinical category.
+    f = PerformancePresenter._dc_label
+    assert f(4.99) == "🟢 forte"
+    assert f(5.0) == "🟡 moderado"
+    assert f(7.5) == "🟡 moderado"
+    assert f(10.0) == "🟡 moderado"
+    assert f(10.01) == "🔴 alto"
 
 
 def test_weight_near_medians_within_window():

@@ -147,6 +147,21 @@ def test_positive_insight_for_low_decoupling(tmp_path):
     assert ("2026-05", r.rides[0].decoupling_pct) in r.monthly_decoupling
 
 
+def test_decoupling_insight_band_boundaries():
+    # Pin the POSITIVE/INFO/WARNING bands at exactly 5.0% and 10.0% so an
+    # off-by-one (< vs <=) can't silently flip a clinical category.
+    end = date(2026, 6, 7)
+
+    def sev(pct):
+        res = _result_with_ride(pct, eligible_count=1, analyzed_count=1)
+        return DecouplingAnalyzer._insights(res, end)[0].severity.value
+
+    assert sev(4.9) == "positive"
+    assert sev(5.0) == "info"          # 5.0 is NOT < 5.0 -> moderate band
+    assert sev(10.0) == "info"         # 10.0 is <= 10.0 -> still moderate
+    assert sev(10.1) == "warning"
+
+
 def test_empty_db_is_safe(tmp_path):
     r = DecouplingAnalyzer(str(tmp_path)).analyze(date(2026, 1, 1),
                                                   date(2026, 6, 7))

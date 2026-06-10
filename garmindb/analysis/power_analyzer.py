@@ -50,6 +50,17 @@ def _is_indoor(type_key: str, manufacturer) -> bool:
     return str(manufacturer or "").upper() in _INDOOR_MANUFACTURERS
 
 
+class _MalformedActivity(Exception):
+    """A cycling ride that carries power but is otherwise unparseable.
+
+    Raised from ``_parse_ride`` (e.g. an unparseable ``startTimeLocal``) so
+    ``_load_rides`` can COUNT and LOG it instead of dropping it silently — a
+    malformed-but-loadable ride with power would otherwise understate the
+    curve/eFTP coverage with no trace. Legitimate filtering (non-cycling, no
+    power meter) stays a quiet ``None``.
+    """
+
+
 @dataclass
 class PowerRide:
     """One ride's parsed power summary."""
@@ -72,13 +83,22 @@ class PowerRide:
 class PowerGate:
     """Verdict of the eFTP publication gate (data-honesty for a clinician)."""
 
-    published: bool
     source_env: Optional[str]            # "outdoor" | "indoor" | None
     candidate_count: int                 # qualifying rides in the recency window
     recency_ok: bool
     if_ok: bool
     newest_effort_date: Optional[date]
     reason: str                          # human-readable verdict (pt-BR)
+
+    @property
+    def published(self) -> bool:
+        """Derived (never stored): all three gate conditions must hold.
+
+        Computed rather than stored so it can never drift out of sync with the
+        conditions that define it (same convention as MetricDelta.delta).
+        """
+        return (self.candidate_count >= GATE_MIN_CANDIDATES
+                and self.recency_ok and self.if_ok)
 
 
 @dataclass
@@ -111,6 +131,16 @@ class PowerAnalysisResult:
     np_variability_ratio: Optional[float] = None  # mean(NP/avg) over long rides, indoor+outdoor mixed
     np_long_ride_count: int = 0            # rides with duration >= 1800s
     insights: List[Insight] = field(default_factory=list)
+
+    def __post_init__(self):
+        # eftp_measured/eftp_source/eftp_date move as a unit: all set (the gate
+        # published a measured eFTP) or all None. Guard against a future edit
+        # desyncing them — a partial triple would let a clinical report show a
+        # number without its source/date (or vice-versa).
+        _triple = (self.eftp_measured, self.eftp_source, self.eftp_date)
+        if any(v is not None for v in _triple) and any(v is None for v in _triple):
+            raise ValueError(
+                "eftp_measured/eftp_source/eftp_date must be all-set or all-None")
 
 
 class PowerAnalyzer:
@@ -155,11 +185,17 @@ class PowerAnalyzer:
             if val is not None:
                 zones[z] = float(val)
 
+        # Past this point the ride is cycling AND carries power, so an
+        # unparseable date is a malformed ride to be traced, not silently
+        # dropped (would understate the curve/eFTP coverage without a trace).
         start = (data.get("startTimeLocal") or "")[:10]
         try:
             ride_date = datetime.strptime(start, "%Y-%m-%d").date()
-        except ValueError:
-            return None
+        except ValueError as err:
+            raise _MalformedActivity(
+                f"activity {data.get('activityId')!r} has power but an "
+                f"unparseable startTimeLocal {start!r}"
+            ) from err
 
         avg = data.get("avgPower")
         best20 = peak.get(1200)
@@ -219,9 +255,9 @@ class PowerAnalyzer:
         """Glob the activities dir and parse all cycling rides with power.
 
         Returns the list of parsed rides plus a count of files that could
-        not be read or decoded. Each unreadable file is logged at WARNING
-        so a silently-corrupt JSON never understates FTP/W-kg/curve without
-        a trace.
+        not be read/decoded OR that carried power but were malformed (e.g. an
+        unparseable date). Each is logged at WARNING and counted so a
+        silently-corrupt ride never understates FTP/W-kg/curve without a trace.
         """
         rides: List[PowerRide] = []
         skipped = 0
@@ -237,7 +273,13 @@ class PowerAnalyzer:
                 logger.warning("Skipping unreadable activity JSON %s: %s",
                                path, err)
                 continue
-            ride = self._parse_ride(data)
+            try:
+                ride = self._parse_ride(data)
+            except _MalformedActivity as err:
+                skipped += 1
+                logger.warning("Skipping malformed activity JSON %s: %s",
+                               path, err)
+                continue
             if ride is not None:
                 rides.append(ride)
         if skipped:
@@ -298,7 +340,7 @@ class PowerAnalyzer:
             reason = ("FTP configurado (não testado nestes dados: "
                       + "; ".join(bits) + ")")
         gate = PowerGate(
-            published=published, source_env=(env if published else None),
+            source_env=(env if published else None),
             candidate_count=count, recency_ok=recency_ok, if_ok=if_ok,
             newest_effort_date=newest, reason=reason,
         )
@@ -318,7 +360,7 @@ class PowerAnalyzer:
         curve_all = self._best_curve(all_rides)
         best20_recent = curve_recent.get(1200)
         best20_all = curve_all.get(1200)
-        est_ftp = round(best20_recent * 0.95) if best20_recent else None
+        est_ftp = round(best20_recent * EFTP_MULTIPLIER) if best20_recent else None
         ftp_needs_test = bool(
             self._ftp and best20_recent and self._ftp > best20_recent
         )
@@ -328,9 +370,9 @@ class PowerAnalyzer:
         outdoor = [r for r in usable if not r.is_indoor]
         curve_indoor = self._best_curve(indoor)
         curve_outdoor = self._best_curve(outdoor)
-        eftp_indoor = (round(curve_indoor[1200] * 0.95)
+        eftp_indoor = (round(curve_indoor[1200] * EFTP_MULTIPLIER)
                        if curve_indoor.get(1200) else None)
-        eftp_outdoor = (round(curve_outdoor[1200] * 0.95)
+        eftp_outdoor = (round(curve_outdoor[1200] * EFTP_MULTIPLIER)
                         if curve_outdoor.get(1200) else None)
         peak_5s, peak_5s_dropped = self._neuromuscular_peak(usable)
 

@@ -25,10 +25,14 @@ import os
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 
 from .activity_analyzer import LOAD_FACTORS
 from .performance_targets import PerformanceTargets
+
+if TYPE_CHECKING:  # type-only; never imported at runtime (no real cycle)
+    from .decoupling_analyzer import DecouplingResult, PaHrResult
+    from .power_analyzer import PowerAnalysisResult
 
 logger = logging.getLogger(__name__)
 
@@ -238,9 +242,9 @@ class LongitudinalReport:
     hrv_status_latest: Optional[str]
     hrv_status_balanced_pct: Optional[float]
     operational_max_hr: Dict[str, Optional[int]]
-    power: object = None        # PowerAnalysisResult | None (avoid import cycle)
-    decoupling: object = None   # DecouplingResult | None (avoid import cycle)
-    pahr: object = None         # PaHrResult | None (avoid import cycle)
+    power: "Optional[PowerAnalysisResult]" = None
+    decoupling: "Optional[DecouplingResult]" = None
+    pahr: "Optional[PaHrResult]" = None
 
 
 # --------------------------------------------------------------------------- #

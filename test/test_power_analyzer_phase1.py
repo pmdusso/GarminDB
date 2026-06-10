@@ -133,6 +133,21 @@ def test_peak_5s_no_1min_reference_passes_through(tmp_path):
     assert r.peak_5s_dropped == 0
 
 
+def test_malformed_date_ride_with_power_is_counted_not_silent(tmp_path):
+    # A cycling ride WITH power but an unparseable startTimeLocal must be
+    # counted + logged (folded into skipped_files), never dropped silently:
+    # otherwise it understates the curve/eFTP coverage with no trace.
+    folder = str(tmp_path)
+    _write(folder, 1, "2026-05-12", indoor=False, maxAvgPower_1200=300,
+           duration=5400.0)
+    _write(folder, 2, "not-a-date", indoor=False, maxAvgPower_1200=999,
+           duration=5400.0)
+    r = PowerAnalyzer(folder, configured_ftp=325).analyze(
+        date(2026, 1, 1), date(2026, 6, 7))
+    assert r.skipped_files == 1              # malformed ride counted, not silent
+    assert r.curve_outdoor[1200] == 300      # the 999 W malformed ride excluded
+
+
 def test_excluded_ride_is_dropped_from_curves(tmp_path):
     folder = str(tmp_path)
     _write(folder, 1, "2026-05-12", indoor=False, maxAvgPower_1200=300,

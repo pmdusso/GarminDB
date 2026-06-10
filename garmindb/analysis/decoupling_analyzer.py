@@ -42,7 +42,11 @@ DECOUPLE_HIGH = 10.0         # > 10% above aerobic threshold / low endurance
 
 @dataclass
 class RideDecoupling:
-    """One outdoor ride's Hr:speed decoupling result."""
+    """One outdoor ride's Hr:speed decoupling result.
+
+    Sign convention: ``decoupling_pct > 0`` means efficiency FELL in the second
+    half (worse aerobic durability); the insight thresholds depend on it.
+    """
 
     activity_id: str
     date: date
@@ -50,7 +54,10 @@ class RideDecoupling:
     distance_km: Optional[float]
     ef_first: float              # speed/HR, first half (cleaned, moving)
     ef_second: float             # speed/HR, second half
-    decoupling_pct: float        # (ef_first - ef_second) / ef_first * 100
+    # (ef_first - ef_second) / ef_first * 100, computed from the UNrounded EFs
+    # then pre-rounded for display — intentionally not recomputable from the
+    # rounded ef_first/ef_second fields above.
+    decoupling_pct: float
     ef_overall: float            # speed/HR over the whole analysed portion
     speed_cv: float              # coefficient of variation of speed
     sample_count: int            # analysed samples (after trim/stop drop)
@@ -74,7 +81,11 @@ class DecouplingResult:
 
 @dataclass
 class PaHrRide:
-    """One ride's power:HR (Pa:Hr) decoupling result."""
+    """One ride's power:HR (Pa:Hr) decoupling result.
+
+    Sign convention: ``decoupling_pct > 0`` means efficiency FELL in the second
+    half (worse aerobic durability); the insight thresholds depend on it.
+    """
 
     activity_id: str
     date: date
@@ -82,7 +93,9 @@ class PaHrRide:
     indoor: bool
     ef_first: float              # power/HR, first half
     ef_second: float             # power/HR, second half
-    decoupling_pct: float        # (ef_first - ef_second) / ef_first * 100
+    # (ef_first - ef_second) / ef_first * 100, computed from the UNrounded EFs
+    # then pre-rounded for display (not recomputable from the rounded fields).
+    decoupling_pct: float
     ef_overall: float            # power/HR over the analysed portion (W/bpm)
     avg_power: float             # mean power over the analysed portion (W)
     sample_count: int
@@ -159,7 +172,13 @@ class DecouplingAnalyzer:
     def _decoupling(
         samples: List[Tuple[float, float, float]],
     ) -> Optional[Tuple[float, float, float, float, float]]:
-        """Return (ef_first, ef_second, decoupling_pct, ef_overall, speed_cv)."""
+        """Return (ef_first, ef_second, decoupling_pct, ef_overall, cv_3rd).
+
+        cv_3rd is the coefficient of variation of the 3rd tuple element — speed
+        for the Hr:speed caller, power for the Pa:Hr caller. The Pa:Hr caller
+        ignores it and gates on a separately-computed speed CV instead.
+        decoupling_pct > 0 means EF FELL in the second half (worse durability).
+        """
         if len(samples) < 2:
             return None
         t_first, t_last = samples[0][0], samples[-1][0]
@@ -310,6 +329,7 @@ class DecouplingAnalyzer:
         return samples, speed_cv
 
     def _pahr_ride(self, activity_id, ride_date, moving_s, indoor):
+        """Load + analyse one ride's Pa:Hr; None if not analysable."""
         recs = self._query(
             "garmin_activities.db",
             "SELECT timestamp, hr, power, speed FROM activity_records "
@@ -344,9 +364,9 @@ class DecouplingAnalyzer:
         steadiness gate; indoor rides are reported ungated (steady=None).
         """
         if not self._has_power_column():
-            logger.info("activity_records has no power column yet (pre-SP1 "
-                        "rebuild); Pa:Hr is empty until garmindb_cli.py "
-                        "--rebuild_db is run.")
+            logger.warning("activity_records has no power column yet (pre-SP1 "
+                           "rebuild); Pa:Hr is empty until garmindb_cli.py "
+                           "--rebuild_db is run.")
             return PaHrResult(period_start=start_date, period_end=end_date)
         rows = self._query(
             "garmin_activities.db",

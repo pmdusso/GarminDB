@@ -286,7 +286,6 @@ class ActivityRecords(ActivitiesDb.Base, idbutils.DbObject):
     position_long = Column(Float)   # degrees
     distance = Column(Float)
     cadence = Column(Integer)
-    altitude = Column(Float)
     hr = Column(Integer)            # beats per minute
     rr = Column(Float)              # breaths per minute
     altitude = Column(Float)        # feet or meters

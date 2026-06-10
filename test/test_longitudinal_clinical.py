@@ -12,7 +12,7 @@ production; columns left empty degrade to 'no data', never crash.
 
 import os
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from garmindb.analysis.longitudinal_report import LongitudinalReportBuilder
 from garmindb.analysis.performance_targets import PerformanceTargets
@@ -335,6 +335,63 @@ def test_operational_max_hr_empty_when_no_activities(tmp_path):
 # --------------------------------------------------------------------------- #
 # End-to-end: every Phase 0 metric populated at once
 # --------------------------------------------------------------------------- #
+
+def _write_activities_with_records(db_dir, aid, day, *, minutes=70):
+    """Activities DB carrying sub_sport AND a per-second activity_records ride.
+
+    Inserts one steady outdoor ride (constant speed + power, HR ramping at the
+    analysed midpoint) so BOTH Hr:speed and Pa:Hr decoupling are computable —
+    the integration path the analyzer-only tests never exercise through build().
+    """
+    con = sqlite3.connect(os.path.join(db_dir, "garmin_activities.db"))
+    con.execute(
+        "CREATE TABLE activities "
+        "(activity_id TEXT, start_time TEXT, sport TEXT, sub_sport TEXT, "
+        "distance FLOAT, moving_time TEXT, ascent FLOAT, training_load FLOAT, "
+        "training_effect FLOAT, anaerobic_training_effect FLOAT, "
+        "avg_hr INTEGER, max_hr INTEGER, calories INTEGER)")
+    con.execute("CREATE TABLE cycle_activities (activity_id TEXT, vo2_max FLOAT)")
+    con.execute("CREATE TABLE steps_activities (activity_id TEXT, vo2_max FLOAT)")
+    con.execute(
+        "CREATE TABLE activity_records (activity_id TEXT, record INTEGER, "
+        "timestamp TEXT, hr INTEGER, speed FLOAT, position_lat FLOAT, "
+        "power INTEGER)")
+    secs = minutes * 60
+    start = datetime(day.year, day.month, day.day, 9, 0, 0)
+    con.execute(
+        "INSERT INTO activities (activity_id, start_time, sport, sub_sport, "
+        "distance, moving_time, ascent, training_load, max_hr, calories) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?)",
+        (str(aid), start.strftime("%Y-%m-%d %H:%M:%S"), "cycling", "generic",
+         35.0, f"{secs // 3600:02d}:{(secs % 3600) // 60:02d}:00", 200.0, 120.0,
+         160, 600))
+    mid = 600 + (secs - 600) / 2.0
+    rows = []
+    for i in range(secs):
+        ts = (start + timedelta(seconds=i)).strftime("%Y-%m-%d %H:%M:%S")
+        hr = 140 if i < mid else 155            # ramp at the analysed midpoint
+        rows.append((str(aid), i, ts, hr, 30.0, -30.05, 200))
+    con.executemany("INSERT INTO activity_records VALUES (?,?,?,?,?,?,?)", rows)
+    con.commit()
+    con.close()
+
+
+def test_longitudinal_renders_decoupling_and_pahr_end_to_end(tmp_path):
+    # End-to-end: a real per-second ride flows through build() into BOTH the
+    # Hr:speed and Pa:Hr sections. Guards the builder->analyzer->renderer wiring
+    # that the analyzer-only tests bypass (and that the _query swallow can hide).
+    _write_garmin_db(str(tmp_path))
+    _write_monitoring_db(str(tmp_path), {})
+    _write_activities_with_records(str(tmp_path), 1, date(2026, 5, 20))
+    report = _builder(tmp_path, date(2026, 1, 1), date(2026, 6, 7)).build()
+    # The wiring actually produced results (not the silently-empty path).
+    assert report.decoupling is not None and report.decoupling.eligible_count == 1
+    assert report.pahr is not None and report.pahr.eligible_count == 1
+    md = LongitudinalPresenter().render(report)
+    assert "FC:velocidade" in md           # Hr:speed decoupling section rendered
+    assert "potência:FC" in md             # Pa:Hr section rendered
+    assert "2026-05" in md                 # the ride's month appears
+
 
 def test_phase0_full_render_smoke(tmp_path):
     daily = _spread_daily(
