@@ -81,7 +81,6 @@ class GarminDbMain():
             sys.exit()
         return (date, days)
 
-
     def copy_data(self, overwrite, latest, stats):
         """Copy data from a mounted Garmin USB device to files."""
         logger.info("___Copying Data___")
@@ -105,7 +104,6 @@ class GarminDbMain():
             monitoring_dir = self.gc_config.get_monitoring_dir(datetime.datetime.now().year)
             root_logger.info("Copying sleep to %s", monitoring_dir)
             copy.copy_sleep(monitoring_dir, latest)
-
 
     def download_data(self, overwrite, latest, stats):
         """Download selected activity types from Garmin Connect and save the data in files. Overwrite previously downloaded data if indicated."""
@@ -163,11 +161,10 @@ class GarminDbMain():
         if Statistics.hrv in stats:
             date, days = self.__get_date_and_days(GarminDb(self.gc_config.get_db_params()), latest, Hrv, Hrv.day, 'hrv')
             if days > 0:
-                hrv_dir = self.gc_config.get_rhr_dir() # HRV tends to be in the same place as RHR or monitoring
+                hrv_dir = self.gc_config.get_rhr_dir()  # HRV tends to be in the same place as RHR or monitoring
                 root_logger.info("Date range to update: %s (%d) to %s", date, days, hrv_dir)
                 download.get_hrv(hrv_dir, date, days, overwrite)
                 root_logger.info("Saved hrv files for %s (%d) to %s for processing", date, days, hrv_dir)
-
 
     def import_data(self, debug, latest, stats):
         """Import previously downloaded Garmin data into the database."""
@@ -256,14 +253,12 @@ class GarminDbMain():
             if gfd.file_count() > 0:
                 gfd.process_files(ActivityFitFileProcessor(self.gc_config.get_db_params(), self.plugin_manager, debug))
 
-
     def analyze_data(self, debug):
         """Analyze the downloaded and imported Garmin data and create summary tables."""
         logger.info("___Analyzing Data___")
         analyze = Analyze(self.gc_config, debug - 1)
         analyze.summary()
         analyze.create_dynamic_views()
-
 
     def backup_dbs(self):
         """Backup GarminDb database files."""
@@ -274,12 +269,10 @@ class GarminDbMain():
             for db in dbs:
                 backupzip.write(db)
 
-
     def delete_dbs(self, delete_db_list=[GarminDb, MonitoringDb, ActivitiesDb, GarminSummaryDb, SummaryDb]):
         """Delete selected database files, or all if none selected."""
         for db in delete_db_list:
             db.delete_db(self.gc_config.get_db_params())
-
 
     def export_activity(self, debug, directory, export_activity_id):
         """Export an activity given its database id."""
@@ -289,13 +282,11 @@ class GarminDbMain():
         ae.process(self.gc_config.get_db_params())
         return ae.write('activity_%s.tcx' % export_activity_id)
 
-
     def basecamp_activity(self, debug, export_activity_id):
         """Export an activity given its database id."""
         file_with_path = self.export_activity(debug, tempfile.mkdtemp(), export_activity_id)
         logger.info("Opening activity %d (%s) in BaseCamp", export_activity_id, file_with_path)
         OpenWithBaseCamp.open(file_with_path)
-
 
     def google_earth_activity(self, debug, export_activity_id):
         """Export an activity given its database id."""
@@ -355,7 +346,7 @@ def main(argv):
 
     if args.backup_dbs:
         garminDbMain.backup_dbs()
-        
+
     if args.delete_db:
         garminDbMain.delete_dbs([GarminDbMain.stats_to_db_map[stat] for stat in stats] + garminDbMain.summary_dbs)
         sys.exit()

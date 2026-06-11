@@ -50,7 +50,7 @@ def main(argv):
             output = subprocess.check_output([sys.executable, '-m', 'pip', 'freeze', requirements_file_path])
             report.write(output.decode())
 
-    with zipfile.ZipFile(args.dir +  os.sep + 'bugreport.zip', 'w') as zip:
+    with zipfile.ZipFile(args.dir + os.sep + 'bugreport.zip', 'w') as zip:
         zip.write(bug_report_txt)
         garmindb_log = args.dir + os.sep + 'garmindb.log'
         if os.path.isfile(garmindb_log):
