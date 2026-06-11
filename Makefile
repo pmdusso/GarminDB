@@ -342,7 +342,7 @@ $(SUBMODULES:%=%-flake8):
 	$(MAKE) -C $(subst -flake8,,$@) flake8
 
 flake8: $(SUBMODULES:%=%-flake8)
-	$(PYTHON_PATH) -m flake8 garmindb/*.py garmindb/garmindb/*.py garmindb/summarydb/*.py garmindb/fitbitdb/*.py garmindb/mshealthdb/*.py --max-line-length=180 --ignore=E203,E221,E241,W503
+	$(PYTHON_PATH) -m flake8 garmindb/*.py garmindb/garmindb/*.py garmindb/summarydb/*.py garmindb/fitbitdb/*.py garmindb/mshealthdb/*.py garmindb/analysis/*.py garmindb/data/*.py garmindb/data/repositories/*.py garmindb/presentation/*.py garmindb/presentation/markdown/*.py scripts/*.py --max-line-length=180 --ignore=E203,E221,E241,W503,W504
 
 regression_test_run: flake8 rebuild_dbs
 	grep ERROR garmindb.log || [ $$? -eq 1 ]
