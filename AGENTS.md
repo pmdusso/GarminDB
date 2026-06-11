@@ -5,7 +5,7 @@
 - CLI and tools: `scripts/` (e.g., `garmindb_cli.py`, `garmindb_bug_report.py`, `fitbit.py`, `mshealth.py`).
 - Tests: `test/` with `test_*.py` and a `Makefile`; sample data in `test/test_files/`.
 - Submodules: `Fit/`, `Tcx/`, `utilities/` (run `git submodule init && git submodule update`).
-- Notebooks and assets: `Jupyter/`, `Screenshots/`; plugins under `Plugins/`.
+- Notebooks (archived): `docs/notebooks/`; assets: `Screenshots/`; plugins under `Plugins/`.
 - Config: `~/.GarminDb/GarminConnectConfig.json` (copy from `garmindb/GarminConnectConfig.json.example`).
 
 ## Build, Test, and Development Commands
