@@ -105,4 +105,4 @@ my-defines.mk
 pyproject.toml
 uv.lock
 
-Jupyter/.ipynb_checkpoints/
+docs/notebooks/.ipynb_checkpoints/
