@@ -20,7 +20,7 @@ import zipfile
 import glob
 
 from garmindb import python_version_check, log_version, format_version
-from garmindb.garmindb import GarminDb, Attributes, Sleep, Weight, RestingHeartRate, Hrv, MonitoringDb, MonitoringHeartRate, ActivitiesDb, GarminSummaryDb
+from garmindb.garmindb import GarminDb, Attributes, Sleep, Weight, RestingHeartRate, Hrv, TrainingReadiness, MonitoringDb, MonitoringHeartRate, ActivitiesDb, GarminSummaryDb
 from garmindb.summarydb import SummaryDb
 
 from garmindb import Download, Copy, Analyze
@@ -51,6 +51,7 @@ class GarminDbMain():
         Statistics.rhr                   : GarminDb,
         Statistics.weight                : GarminDb,
         Statistics.hrv                   : GarminDb,
+        Statistics.training_readiness    : GarminDb,
         Statistics.activities            : ActivitiesDb
     }
 
@@ -166,6 +167,14 @@ class GarminDbMain():
                 download.get_hrv(hrv_dir, date, days, overwrite)
                 root_logger.info("Saved hrv files for %s (%d) to %s for processing", date, days, hrv_dir)
 
+        if Statistics.training_readiness in stats:
+            date, days = self.__get_date_and_days(GarminDb(self.gc_config.get_db_params()), latest, TrainingReadiness, TrainingReadiness.day, 'training_readiness')
+            if days > 0:
+                tr_dir = self.gc_config.get_training_readiness_dir()
+                root_logger.info("Date range to update: %s (%d) to %s", date, days, tr_dir)
+                download.get_training_readiness(tr_dir, date, days, overwrite)
+                root_logger.info("Saved training readiness files for %s (%d) to %s for processing", date, days, tr_dir)
+
     def import_data(self, debug, latest, stats):
         """Import previously downloaded Garmin data into the database."""
         logger.info("___Importing %s Data___", 'Latest' if latest else 'All')
@@ -233,6 +242,13 @@ class GarminDbMain():
             ghrvd = GarminHrvData(self.gc_config.get_db_params(), hrv_dir, latest, debug)
             if ghrvd.file_count() > 0:
                 ghrvd.process()
+
+        if Statistics.training_readiness in stats:
+            from garmindb import GarminTrainingReadinessData
+            tr_dir = self.gc_config.get_training_readiness_dir()
+            gtrd = GarminTrainingReadinessData(self.gc_config.get_db_params(), tr_dir, latest, debug)
+            if gtrd.file_count() > 0:
+                gtrd.process()
 
         if Statistics.activities in stats:
             activities_dir = self.gc_config.get_activities_dir()
@@ -321,6 +337,8 @@ def main(argv):
     stats_group.add_argument("-m", "--monitoring", help="Download and/or import monitoring data.", dest='stats', action='append_const', const=Statistics.monitoring)
     stats_group.add_argument("-r", "--rhr", help="Download and/or import resting heart rate data.", dest='stats', action='append_const', const=Statistics.rhr)
     stats_group.add_argument("--hrv", help="Download and/or import heart rate variability data.", dest='stats', action='append_const', const=Statistics.hrv)
+    stats_group.add_argument("--training_readiness", help="Download and/or import training readiness data.",
+                             dest='stats', action='append_const', const=Statistics.training_readiness)
     stats_group.add_argument("-s", "--sleep", help="Download and/or import sleep data.", dest='stats', action='append_const', const=Statistics.sleep)
     stats_group.add_argument("-w", "--weight", help="Download and/or import weight data.", dest='stats', action='append_const', const=Statistics.weight)
     modifiers_group = parser.add_argument_group('Modifiers')
