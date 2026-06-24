@@ -15,6 +15,7 @@ class TestTrainingReadinessCliSmoke(unittest.TestCase):
         out = subprocess.run(
             [sys.executable, 'scripts/garmindb_cli.py', '--help'],
             capture_output=True, text=True, env={'PYTHONPATH': '.', 'PATH': ''})
+        self.assertEqual(out.returncode, 0, out.stderr)
         self.assertIn('--training_readiness', out.stdout)
 
 
