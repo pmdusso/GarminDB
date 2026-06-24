@@ -37,6 +37,29 @@ class TestReadinessAnalyzer(unittest.TestCase):
         self.assertEqual(result.recent_days[0].score, 69)
         self.assertEqual(dict(result.monthly_score)['2026-06'], round((80 + 60 + 69) / 3, 1))
 
+    def test_cross_month_gap(self):
+        def seed_months(db_dir):
+            con = sqlite3.connect(os.path.join(db_dir, 'garmin.db'))
+            con.execute(
+                "CREATE TABLE training_readiness (day TIMESTAMP PRIMARY KEY, "
+                "score INTEGER, level TEXT, feedback_short TEXT, recovery_time INTEGER)")
+            rows = [('2026-03-10 06:00:00', 40), ('2026-03-20 06:00:00', 60),
+                    ('2026-06-05 06:00:00', 70), ('2026-06-15 06:00:00', 80)]
+            for day, score in rows:
+                con.execute("INSERT INTO training_readiness (day, score) VALUES (?,?)",
+                            (day, score))
+            con.commit()
+            con.close()
+
+        with tempfile.TemporaryDirectory() as d:
+            seed_months(d)
+            result = TrainingReadinessAnalyzer(d).analyze(date(2026, 3, 1), date(2026, 6, 30))
+        monthly = dict(result.monthly_score)
+        self.assertEqual(monthly['2026-03'], round((40 + 60) / 2, 1))
+        self.assertEqual(monthly['2026-06'], round((70 + 80) / 2, 1))
+        self.assertIsNone(monthly['2026-04'])  # gap month
+        self.assertIsNone(monthly['2026-05'])  # gap month
+
     def test_missing_db_is_empty(self):
         with tempfile.TemporaryDirectory() as d:
             result = TrainingReadinessAnalyzer(d).analyze(date(2026, 6, 1), date(2026, 6, 30))

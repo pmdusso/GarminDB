@@ -44,11 +44,34 @@ class TestTrainingReadinessImport(unittest.TestCase):
         self.assertEqual(row.score, 69)  # latest timestamp wins
 
     def test_empty_list_inserts_nothing(self):
+        import datetime
+        day = datetime.datetime(2026, 6, 23)
         with tempfile.TemporaryDirectory() as d:
             with open(os.path.join(d, 'training_readiness_2026-06-23.json'), 'w') as f:
                 json.dump([], f)
             tr = GarminTrainingReadinessData(self.db_params, d, False, False)
-            tr.process()  # must not raise
+            # _process_json([]) returns 0 (no reading persisted).
+            self.assertEqual(tr._process_json([]), 0)
+        garmin_db = GarminDb(self.db_params)
+        self.assertIsNone(TrainingReadiness.get(garmin_db, day))
+
+    def test_missing_timestamp_picks_valid(self):
+        with tempfile.TemporaryDirectory() as d:
+            no_ts = _reading('2026-06-24T06:00:00.0', 42)
+            no_ts['timestamp'] = None
+            no_ts['calendarDate'] = '2026-06-24'
+            valid = _reading('2026-06-24T15:45:58.0', 77)
+            valid['calendarDate'] = '2026-06-24'
+            data = [no_ts, valid]
+            with open(os.path.join(d, 'training_readiness_2026-06-24.json'), 'w') as f:
+                json.dump(data, f)
+            tr = GarminTrainingReadinessData(self.db_params, d, False, False)
+            self.assertEqual(tr.file_count(), 1)
+            tr.process()  # datetime.min fallback for None ts must not crash
+        garmin_db = GarminDb(self.db_params)
+        import datetime
+        row = TrainingReadiness.get(garmin_db, datetime.datetime(2026, 6, 24))
+        self.assertEqual(row.score, 77)  # valid timestamp wins over None
 
 
 if __name__ == '__main__':
