@@ -503,7 +503,32 @@ class LongitudinalPresenter:
                 "e o fitness deve reconstruir na fase de build.")
         lines.append("")
         lines.append(self._load_table(r))
+        lines.append(self._training_readiness(r))
         return "\n".join(lines) + "\n"
+
+    def _training_readiness(self, r) -> str:
+        tr = getattr(r, "training_readiness", None)
+        if tr is None or getattr(tr, "day_count", 0) == 0:
+            return ""
+        body = ["\n### Prontidão de treino (Training Readiness)\n",
+                "Score diário 0–100 do Garmin combinando sono, recuperação, VFC, "
+                "histórico de stress/sono e carga aguda. Síntese matinal de "
+                "prontidão (triagem, não diagnóstico).\n"]
+        months = [(ym, sc) for ym, sc in tr.monthly_score if sc is not None]
+        if months:
+            body.append("| Mês | Score médio |")
+            body.append("|---|---|")
+            for ym, sc in months:
+                body.append(f"| {ym} | {_num(sc, 1)} |")
+        if tr.recent_days:
+            body.append("\n**Dias recentes:**\n")
+            body.append("| Dia | Score | Nível | Recuperação (min) | Feedback |")
+            body.append("|---|---|---|---|---|")
+            for d in tr.recent_days:
+                rt = d.recovery_time if d.recovery_time is not None else "—"
+                body.append(f"| {d.day} | {d.score} | {d.level} | {rt} | {d.feedback_short} |")
+        body.append(f"\n_{tr.day_count} dia(s) com leitura de prontidão no período._")
+        return "\n".join(body)
 
     def _recovery(self, r: LongitudinalReport) -> str:
         lines = ["\n## 5. Recuperação: sono e Body Battery\n"]
