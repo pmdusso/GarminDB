@@ -32,6 +32,7 @@
         "sleep"                         : true,
         "rhr"                           : true,
         "hrv"                           : true,
+        "training_readiness"            : true,
         "weight"                        : true,
         "activities"                    : true
     },

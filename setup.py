@@ -2,7 +2,7 @@
 
 import re
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 def get_version(version_file):
@@ -38,7 +38,7 @@ print(f"Building {module_name} {module_version}")
 
 
 setup(name=module_name, version=module_version, author='Tom Goetz',
-      packages=[module_name, f'{module_name}.garmindb', f'{module_name}.fitbitdb', f'{module_name}.mshealthdb', f'{module_name}.summarydb'],
+      packages=find_packages(include=[module_name, f'{module_name}.*']),
       scripts=['scripts/garmindb_cli.py', 'scripts/garmindb_checkup.py', 'scripts/garmindb_bug_report.py', 'scripts/fitbit.py', 'scripts/mshealth.py'],
       description='Download data from Garmin Connect and store it in a SQLite db for analysis.',
       long_description=module_long_description,

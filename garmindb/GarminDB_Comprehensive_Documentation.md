@@ -33,7 +33,7 @@ Current version: 3.6.4
 - SQLite database storage with normalized schema
 - Data analysis and statistics generation
 - Activity export to TCX format
-- Jupyter notebook integration for data visualization
+- Legacy Jupyter notebooks for data visualization (archived under `docs/notebooks/`)
 - Plugin architecture for custom data processing
 - Support for multiple data sources (Garmin, Fitbit, Microsoft Health)
 
@@ -65,7 +65,7 @@ GarminDB/
 ├── Tcx/                   # TCX file parsing submodule
 ├── utilities/             # Common utilities submodule
 ├── Plugins/              # Plugin extensions
-├── Jupyter/              # Jupyter notebooks for analysis
+├── docs/notebooks/        # Archived Jupyter notebooks (legacy)
 └── test/                 # Test suite
 ```
 
@@ -518,8 +518,8 @@ garmindb_cli.py --rebuild_db
 
 ## Additional Resources
 
-### Jupyter Notebooks
-Located in `Jupyter/` directory:
+### Jupyter Notebooks (archived)
+Located in `docs/notebooks/` (archived, unmaintained):
 - `activities.ipynb`: Activity analysis
 - `daily.ipynb`: Daily statistics
 - `monitoring.ipynb`: Heart rate monitoring
@@ -537,7 +537,7 @@ Automatically created views for easier querying:
 - JSON for raw data
 
 ### Third-Party Integrations
-- Jupyter for visualization
+- Jupyter for visualization (legacy, archived under `docs/notebooks/`)
 - SQLite browsers for direct queries
 - External analysis tools via exports
 

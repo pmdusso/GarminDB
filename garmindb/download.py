@@ -43,6 +43,7 @@ class Download():
     garmin_connect_daily_summary_url = garmin_connect_usersummary_url + "/daily"
     garmin_connect_daily_hydration_url = garmin_connect_usersummary_url + "/hydration/allData"
     garmin_connect_hrv_url = "/hrv-service/hrv"
+    garmin_connect_training_readiness_url = "/metrics-service/metrics/trainingreadiness"
 
     # https://connect.garmin.com/modern/proxy/usersummary-service/usersummary/hydration/allData/2019-11-29
 
@@ -303,3 +304,17 @@ class Download():
         """Download the heart rate variability (HRV) data from Garmin Connect and save to a JSON file."""
         root_logger.info("Getting hrv: %s (%d)", date, days)
         self.__get_stat(self.__get_hrv_day, directory, date, days, overwrite)
+
+    def __get_training_readiness_day(self, directory, day, overwrite=False):
+        date_str = day.strftime('%Y-%m-%d')
+        json_filename = f'{directory}/training_readiness_{date_str}'
+        url = f'{self.garmin_connect_training_readiness_url}/{date_str}'
+        try:
+            self.save_json_to_file(json_filename, self.garmin.connectapi(url), overwrite)
+        except GarminConnectAuthError as e:
+            root_logger.error("Exception getting training readiness %s", e)
+
+    def get_training_readiness(self, directory, date, days, overwrite):
+        """Download the training readiness data from Garmin Connect and save to a JSON file."""
+        root_logger.info("Getting training readiness: %s (%d)", date, days)
+        self.__get_stat(self.__get_training_readiness_day, directory, date, days, overwrite)

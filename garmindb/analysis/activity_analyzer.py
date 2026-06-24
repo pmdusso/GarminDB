@@ -700,7 +700,7 @@ class ActivityAnalyzer:
                     "Monitor HRV and resting HR closely"
                 ],
             )
-        
+
         if low_intensity_pct < 50 and (high_intensity_pct + moderate_intensity_pct) > 50:
             return Insight(
                 title="Lack of Base Training",
@@ -718,5 +718,5 @@ class ActivityAnalyzer:
                     "Target an 80/20 intensity distribution"
                 ],
             )
-            
+
         return None

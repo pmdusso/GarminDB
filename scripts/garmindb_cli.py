@@ -20,7 +20,7 @@ import zipfile
 import glob
 
 from garmindb import python_version_check, log_version, format_version
-from garmindb.garmindb import GarminDb, Attributes, Sleep, Weight, RestingHeartRate, Hrv, MonitoringDb, MonitoringHeartRate, ActivitiesDb, GarminSummaryDb
+from garmindb.garmindb import GarminDb, Attributes, Sleep, Weight, RestingHeartRate, Hrv, TrainingReadiness, MonitoringDb, MonitoringHeartRate, ActivitiesDb, GarminSummaryDb
 from garmindb.summarydb import SummaryDb
 
 from garmindb import Download, Copy, Analyze
@@ -51,6 +51,7 @@ class GarminDbMain():
         Statistics.rhr                   : GarminDb,
         Statistics.weight                : GarminDb,
         Statistics.hrv                   : GarminDb,
+        Statistics.training_readiness    : GarminDb,
         Statistics.activities            : ActivitiesDb
     }
 
@@ -81,7 +82,6 @@ class GarminDbMain():
             sys.exit()
         return (date, days)
 
-
     def copy_data(self, overwrite, latest, stats):
         """Copy data from a mounted Garmin USB device to files."""
         logger.info("___Copying Data___")
@@ -105,7 +105,6 @@ class GarminDbMain():
             monitoring_dir = self.gc_config.get_monitoring_dir(datetime.datetime.now().year)
             root_logger.info("Copying sleep to %s", monitoring_dir)
             copy.copy_sleep(monitoring_dir, latest)
-
 
     def download_data(self, overwrite, latest, stats):
         """Download selected activity types from Garmin Connect and save the data in files. Overwrite previously downloaded data if indicated."""
@@ -163,11 +162,18 @@ class GarminDbMain():
         if Statistics.hrv in stats:
             date, days = self.__get_date_and_days(GarminDb(self.gc_config.get_db_params()), latest, Hrv, Hrv.day, 'hrv')
             if days > 0:
-                hrv_dir = self.gc_config.get_rhr_dir() # HRV tends to be in the same place as RHR or monitoring
+                hrv_dir = self.gc_config.get_rhr_dir()  # HRV tends to be in the same place as RHR or monitoring
                 root_logger.info("Date range to update: %s (%d) to %s", date, days, hrv_dir)
                 download.get_hrv(hrv_dir, date, days, overwrite)
                 root_logger.info("Saved hrv files for %s (%d) to %s for processing", date, days, hrv_dir)
 
+        if Statistics.training_readiness in stats:
+            date, days = self.__get_date_and_days(GarminDb(self.gc_config.get_db_params()), latest, TrainingReadiness, TrainingReadiness.day, 'training_readiness')
+            if days > 0:
+                tr_dir = self.gc_config.get_training_readiness_dir()
+                root_logger.info("Date range to update: %s (%d) to %s", date, days, tr_dir)
+                download.get_training_readiness(tr_dir, date, days, overwrite)
+                root_logger.info("Saved training readiness files for %s (%d) to %s for processing", date, days, tr_dir)
 
     def import_data(self, debug, latest, stats):
         """Import previously downloaded Garmin data into the database."""
@@ -237,6 +243,13 @@ class GarminDbMain():
             if ghrvd.file_count() > 0:
                 ghrvd.process()
 
+        if Statistics.training_readiness in stats:
+            from garmindb import GarminTrainingReadinessData
+            tr_dir = self.gc_config.get_training_readiness_dir()
+            gtrd = GarminTrainingReadinessData(self.gc_config.get_db_params(), tr_dir, latest, debug)
+            if gtrd.file_count() > 0:
+                gtrd.process()
+
         if Statistics.activities in stats:
             activities_dir = self.gc_config.get_activities_dir()
             # Tcx fields are less precise than the JSON files, so load Tcx first and overwrite with better JSON values.
@@ -256,14 +269,12 @@ class GarminDbMain():
             if gfd.file_count() > 0:
                 gfd.process_files(ActivityFitFileProcessor(self.gc_config.get_db_params(), self.plugin_manager, debug))
 
-
     def analyze_data(self, debug):
         """Analyze the downloaded and imported Garmin data and create summary tables."""
         logger.info("___Analyzing Data___")
         analyze = Analyze(self.gc_config, debug - 1)
         analyze.summary()
         analyze.create_dynamic_views()
-
 
     def backup_dbs(self):
         """Backup GarminDb database files."""
@@ -274,12 +285,10 @@ class GarminDbMain():
             for db in dbs:
                 backupzip.write(db)
 
-
     def delete_dbs(self, delete_db_list=[GarminDb, MonitoringDb, ActivitiesDb, GarminSummaryDb, SummaryDb]):
         """Delete selected database files, or all if none selected."""
         for db in delete_db_list:
             db.delete_db(self.gc_config.get_db_params())
-
 
     def export_activity(self, debug, directory, export_activity_id):
         """Export an activity given its database id."""
@@ -289,13 +298,11 @@ class GarminDbMain():
         ae.process(self.gc_config.get_db_params())
         return ae.write('activity_%s.tcx' % export_activity_id)
 
-
     def basecamp_activity(self, debug, export_activity_id):
         """Export an activity given its database id."""
         file_with_path = self.export_activity(debug, tempfile.mkdtemp(), export_activity_id)
         logger.info("Opening activity %d (%s) in BaseCamp", export_activity_id, file_with_path)
         OpenWithBaseCamp.open(file_with_path)
-
 
     def google_earth_activity(self, debug, export_activity_id):
         """Export an activity given its database id."""
@@ -330,6 +337,8 @@ def main(argv):
     stats_group.add_argument("-m", "--monitoring", help="Download and/or import monitoring data.", dest='stats', action='append_const', const=Statistics.monitoring)
     stats_group.add_argument("-r", "--rhr", help="Download and/or import resting heart rate data.", dest='stats', action='append_const', const=Statistics.rhr)
     stats_group.add_argument("--hrv", help="Download and/or import heart rate variability data.", dest='stats', action='append_const', const=Statistics.hrv)
+    stats_group.add_argument("--training_readiness", help="Download and/or import training readiness data.",
+                             dest='stats', action='append_const', const=Statistics.training_readiness)
     stats_group.add_argument("-s", "--sleep", help="Download and/or import sleep data.", dest='stats', action='append_const', const=Statistics.sleep)
     stats_group.add_argument("-w", "--weight", help="Download and/or import weight data.", dest='stats', action='append_const', const=Statistics.weight)
     modifiers_group = parser.add_argument_group('Modifiers')
@@ -355,7 +364,7 @@ def main(argv):
 
     if args.backup_dbs:
         garminDbMain.backup_dbs()
-        
+
     if args.delete_db:
         garminDbMain.delete_dbs([GarminDbMain.stats_to_db_map[stat] for stat in stats] + garminDbMain.summary_dbs)
         sys.exit()

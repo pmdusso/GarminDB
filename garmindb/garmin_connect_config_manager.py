@@ -144,6 +144,10 @@ class GarminConnectConfigManager(JsonConfig):
         """Return the configured directory of where the resting heart rate files will be stored."""
         return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'RHR')
 
+    def get_training_readiness_dir(self):
+        """Return the configured directory of where the training readiness files will be stored."""
+        return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'TrainingReadiness')
+
     def get_fitbit_dir(self):
         """Return the configured directory of where the FitBit will be stored."""
         return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'FitBitFiles')

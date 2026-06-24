@@ -93,8 +93,7 @@ bugreport.txt
 .*.conf
 GarminConnectConfig.json
 GarminConnectConfig.local.json
-temp_config/GarminConnectConfig.json
-temp_config/garth_session
+temp_config/
 temp/
 *stats.txt
 *.png
@@ -105,4 +104,4 @@ my-defines.mk
 pyproject.toml
 uv.lock
 
-Jupyter/.ipynb_checkpoints/
+docs/notebooks/.ipynb_checkpoints/

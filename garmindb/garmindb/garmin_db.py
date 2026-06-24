@@ -357,6 +357,50 @@ class Hrv(GarminDb.Base, idbutils.DbObject):
         }
 
 
+class TrainingReadiness(GarminDb.Base, idbutils.DbObject):
+    """Class representing a daily Garmin Training Readiness reading."""
+
+    __tablename__ = 'training_readiness'
+
+    db = GarminDb
+    table_version = 1
+    _col_units = {
+        'recovery_time': 'mins',
+        'acute_load': 'load',
+        'sleep_score_factor_pct': '%',
+        'acwr_factor_pct': '%',
+        'stress_history_factor_pct': '%',
+        'hrv_factor_pct': '%',
+        'sleep_history_factor_pct': '%',
+        'hrv_weekly_average': 'ms',
+    }
+
+    day = Column(DateTime, primary_key=True)
+    timestamp = Column(DateTime)
+    score = Column(Integer)
+    level = Column(String)
+    feedback_short = Column(String)
+    feedback_long = Column(String)
+    recovery_time = Column(Integer)  # minutes (per the Garmin API)
+    sleep_score = Column(Integer)
+    sleep_score_factor_pct = Column(Integer)
+    acwr_factor_pct = Column(Integer)
+    acute_load = Column(Integer)
+    stress_history_factor_pct = Column(Integer)
+    hrv_factor_pct = Column(Integer)
+    hrv_weekly_average = Column(Integer)
+    sleep_history_factor_pct = Column(Integer)
+
+    @classmethod
+    def get_stats(cls, session, start_ts, end_ts):
+        """Return a dictionary of aggregate statistics for the given time period."""
+        return {
+            'readiness_avg': cls.s_get_col_avg(session, cls.score, start_ts, end_ts, ignore_le_zero=True),
+            'readiness_min': cls.s_get_col_min(session, cls.score, start_ts, end_ts, ignore_le_zero=True),
+            'readiness_max': cls.s_get_col_max(session, cls.score, start_ts, end_ts),
+        }
+
+
 class DailySummary(GarminDb.Base, idbutils.DbObject):
     """Class representing a Garmin daily summary."""
 

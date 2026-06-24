@@ -361,3 +361,84 @@ def test_days_and_weeks_to_race(tmp_path):
     report = b.build()
     assert report.days_to_race == days
     assert report.weeks_to_race == round(days / 7)   # 16, not floor 15
+
+
+def test_training_readiness_none_when_analyzer_raises(tmp_path):
+    """Resilience contract: analyzer raising must yield None, not crash the report."""
+    from unittest.mock import patch
+    with patch(
+        "garmindb.analysis.readiness_analyzer.TrainingReadinessAnalyzer.analyze",
+        side_effect=RuntimeError("boom"),
+    ):
+        report = _builder(tmp_path, date(2025, 1, 1), date(2026, 6, 8)).build()
+    assert report.training_readiness is None
+
+
+def test_report_has_training_readiness_field(tmp_path):
+    """LongitudinalReport must expose training_readiness (empty result when table absent)."""
+    from garmindb.analysis.longitudinal_report import LongitudinalReport
+    assert 'training_readiness' in LongitudinalReport.__dataclass_fields__
+    # build() must not crash even when the readiness table is absent.
+    # The analyzer never raises — it returns an empty TrainingReadinessResult.
+    report = _builder(tmp_path, date(2025, 1, 1), date(2026, 6, 8)).build()
+    assert report.training_readiness is not None
+    assert report.training_readiness.day_count == 0
+
+
+# --------------------------------------------------------------------------- #
+# Training Readiness — end-to-end render wiring (Section 4)
+# --------------------------------------------------------------------------- #
+
+def _write_training_readiness_rows(db_dir, rows):
+    """Insert rows into garmin.db training_readiness table.
+
+    ``rows`` is a list of (day_str, score, level, recovery_time, feedback_short).
+    Creates the table if garmin.db doesn't exist yet.
+    """
+    con = sqlite3.connect(os.path.join(db_dir, "garmin.db"))
+    con.execute(
+        "CREATE TABLE IF NOT EXISTS training_readiness "
+        "(day TEXT, score INTEGER, level TEXT, recovery_time INTEGER, "
+        "feedback_short TEXT)"
+    )
+    for row in rows:
+        con.execute("INSERT INTO training_readiness VALUES (?,?,?,?,?)", row)
+    con.commit()
+    con.close()
+
+
+def test_render_includes_training_readiness_section_when_data_present(tmp_path):
+    """End-to-end: render() must include the 'Prontidão de treino' heading when
+    training_readiness rows exist in garmin.db.
+
+    This test covers the _load() → append(self._training_readiness(r)) wiring.
+    If that append were removed, render() would produce a document with Section 4
+    but without the 'Prontidão de treino' heading, causing this assertion to FAIL.
+    """
+    _write_garmin_db(str(tmp_path))
+    _write_activities_db(str(tmp_path), [])
+    _write_monitoring_db(str(tmp_path), {})
+    _write_training_readiness_rows(str(tmp_path), [
+        ("2026-06-22 00:00:00", 69, "MODERATE", 101, "RECOVERED_AND_READY"),
+        ("2026-06-21 00:00:00", 74, "HIGH", None, "READY"),
+    ])
+    report = _builder(tmp_path, date(2026, 6, 1), date(2026, 6, 30)).build()
+    md = LongitudinalPresenter().render(report)
+    assert "Prontidão de treino" in md
+    assert "69" in md
+
+
+def test_render_omits_training_readiness_section_when_no_data(tmp_path):
+    """End-to-end: render() must NOT include 'Prontidão de treino' when the
+    training_readiness table is absent (day_count == 0).
+
+    Mirrors the suppression contract tested by the unit-level
+    test_training_readiness_section_suppressed_when_day_count_zero, but via the
+    public render() entry-point so the _load append path is exercised.
+    """
+    _write_garmin_db(str(tmp_path))
+    _write_activities_db(str(tmp_path), [])
+    _write_monitoring_db(str(tmp_path), {})
+    report = _builder(tmp_path, date(2026, 6, 1), date(2026, 6, 30)).build()
+    md = LongitudinalPresenter().render(report)
+    assert "Prontidão de treino" not in md

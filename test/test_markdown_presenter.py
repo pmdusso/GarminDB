@@ -109,5 +109,49 @@ class TestMarkdownPresenter(unittest.TestCase):
         self.assertIn("Go to bed earlier", markdown)
 
 
+    def test_training_readiness_section_renders(self):
+        from datetime import date
+        from garmindb.analysis.readiness_analyzer import (
+            TrainingReadinessResult, ReadinessDay)
+        from garmindb.presentation.markdown.longitudinal_renderer import LongitudinalPresenter
+
+        tr = TrainingReadinessResult(
+            period_start=date(2026, 6, 1), period_end=date(2026, 6, 30),
+            recent_days=[ReadinessDay(date(2026, 6, 22), 69, 'MODERATE', 101, 'RECOVERED_AND_READY')],
+            monthly_score=[('2026-06', 69.0)], day_count=1)
+        out = LongitudinalPresenter()._training_readiness(type('R', (), {'training_readiness': tr})())
+        self.assertIn('Training Readiness', out)
+        self.assertIn('69', out)
+        self.assertIn('101', out)
+
+    def test_training_readiness_recovery_time_none_renders_dash(self):
+        from datetime import date
+        from garmindb.analysis.readiness_analyzer import (
+            TrainingReadinessResult, ReadinessDay)
+        from garmindb.presentation.markdown.longitudinal_renderer import LongitudinalPresenter
+
+        tr = TrainingReadinessResult(
+            period_start=date(2026, 6, 1), period_end=date(2026, 6, 30),
+            recent_days=[ReadinessDay(date(2026, 6, 22), 69, 'MODERATE', None, 'RECOVERED_AND_READY')],
+            monthly_score=[('2026-06', 69.0)], day_count=1)
+        out = LongitudinalPresenter()._training_readiness(type('R', (), {'training_readiness': tr})())
+        self.assertIn('—', out)
+
+    def test_training_readiness_section_suppressed_when_empty(self):
+        from garmindb.presentation.markdown.longitudinal_renderer import LongitudinalPresenter
+        out = LongitudinalPresenter()._training_readiness(type('R', (), {'training_readiness': None})())
+        self.assertEqual(out, '')
+
+    def test_training_readiness_section_suppressed_when_day_count_zero(self):
+        from garmindb.analysis.readiness_analyzer import TrainingReadinessResult
+        from garmindb.presentation.markdown.longitudinal_renderer import LongitudinalPresenter
+        from datetime import date
+        tr = TrainingReadinessResult(
+            period_start=date(2026, 6, 1), period_end=date(2026, 6, 30),
+            recent_days=[], monthly_score=[], day_count=0)
+        out = LongitudinalPresenter()._training_readiness(type('R', (), {'training_readiness': tr})())
+        self.assertEqual(out, '')
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -33,6 +33,7 @@ from .performance_targets import PerformanceTargets
 if TYPE_CHECKING:  # type-only; never imported at runtime (no real cycle)
     from .decoupling_analyzer import DecouplingResult, PaHrResult
     from .power_analyzer import PowerAnalysisResult
+    from .readiness_analyzer import TrainingReadinessResult
 
 logger = logging.getLogger(__name__)
 
@@ -245,6 +246,7 @@ class LongitudinalReport:
     power: "Optional[PowerAnalysisResult]" = None
     decoupling: "Optional[DecouplingResult]" = None
     pahr: "Optional[PaHrResult]" = None
+    training_readiness: "Optional[TrainingReadinessResult]" = None
 
 
 # --------------------------------------------------------------------------- #
@@ -370,6 +372,7 @@ class LongitudinalReportBuilder:
         power = self._power()
         decoupling = self._decoupling()
         pahr = self._pahr()
+        training_readiness = self._training_readiness()
 
         return LongitudinalReport(
             generated_at=self._generated,
@@ -400,6 +403,7 @@ class LongitudinalReportBuilder:
             power=power,
             decoupling=decoupling,
             pahr=pahr,
+            training_readiness=training_readiness,
         )
 
     # -- db access ---------------------------------------------------------- #
@@ -1223,6 +1227,15 @@ class LongitudinalReportBuilder:
                 self._start, self._end)
         except Exception as e:  # never let Pa:Hr break the clinical report
             logger.warning("Longitudinal Pa:Hr analysis failed: %s", e)
+            return None
+
+    def _training_readiness(self):
+        """Training readiness trend over the period (None on any failure)."""
+        from .readiness_analyzer import TrainingReadinessAnalyzer
+        try:
+            return TrainingReadinessAnalyzer(self._db_dir).analyze(self._start, self._end)
+        except Exception as e:  # never let readiness break the clinical report
+            logger.warning("Longitudinal readiness analysis failed: %s", e)
             return None
 
     def _days_to_race(self) -> Optional[int]:

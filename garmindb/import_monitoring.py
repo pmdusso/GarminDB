@@ -13,7 +13,7 @@ import enum
 import fitfile
 from idbutils import JsonFileProcessor, Conversions
 
-from .garmindb import GarminDb, Attributes, Weight, Sleep, SleepEvents, RestingHeartRate, DailySummary, Hrv
+from .garmindb import GarminDb, Attributes, Weight, Sleep, SleepEvents, RestingHeartRate, DailySummary, Hrv, TrainingReadiness
 from .fit_data import FitData
 
 
@@ -519,4 +519,56 @@ class GarminHrvData(JsonFileProcessor):
             'status': self._get_field(hrv_summary, 'status', str)
         }
         Hrv.insert_or_update(self.garmin_db, point, ignore_none=True)
+        return 1
+
+
+class GarminTrainingReadinessData(JsonFileProcessor):
+    """Class for importing JSON formatted Garmin Connect Training Readiness data into a database."""
+
+    def __init__(self, db_params, input_dir, latest, debug):
+        """Return an instance of GarminTrainingReadinessData.
+
+        Parameters:
+        ----------
+        db_params (object): configuration data for accessing the database
+        input_dir (string): directory (full path) to check for readiness files
+        latest (Boolean): check for latest files only
+        debug (Boolean): enable debug logging
+        """
+        super().__init__(r'training_readiness_\d{4}-\d{2}-\d{2}\.json', input_dir=input_dir, latest=latest, debug=debug)
+        self.garmin_db = GarminDb(db_params)
+        self.conversions = {'calendarDate': self._parse_date, 'timestamp': self._parse_date}
+
+    def _process_json(self, json_data):
+        # The endpoint returns a list of intra-day readings; keep the latest.
+        if not json_data:
+            return 0
+        readings = json_data if isinstance(json_data, list) else [json_data]
+        # Pick the latest intra-day reading by timestamp. Readings with a
+        # timestamp sort ahead of those without (None), and same-type datetimes
+        # are compared among themselves -- this avoids a TypeError from mixing a
+        # converted (possibly tz-aware) datetime with a naive sentinel fallback.
+        latest = max(readings, key=lambda r: (r.get('timestamp') is not None, r.get('timestamp')))
+        day = latest.get('calendarDate')
+        if day is None:
+            return 0
+        ts = latest.get('timestamp')
+        point = {
+            'day': day.date() if hasattr(day, 'date') else day,
+            'timestamp': ts,
+            'score': self._get_field(latest, 'score', int),
+            'level': self._get_field(latest, 'level', str),
+            'feedback_short': self._get_field(latest, 'feedbackShort', str),
+            'feedback_long': self._get_field(latest, 'feedbackLong', str),
+            'recovery_time': self._get_field(latest, 'recoveryTime', int),
+            'sleep_score': self._get_field(latest, 'sleepScore', int),
+            'sleep_score_factor_pct': self._get_field(latest, 'sleepScoreFactorPercent', int),
+            'acwr_factor_pct': self._get_field(latest, 'acwrFactorPercent', int),
+            'acute_load': self._get_field(latest, 'acuteLoad', int),
+            'stress_history_factor_pct': self._get_field(latest, 'stressHistoryFactorPercent', int),
+            'hrv_factor_pct': self._get_field(latest, 'hrvFactorPercent', int),
+            'hrv_weekly_average': self._get_field(latest, 'hrvWeeklyAverage', int),
+            'sleep_history_factor_pct': self._get_field(latest, 'sleepHistoryFactorPercent', int),
+        }
+        TrainingReadiness.insert_or_update(self.garmin_db, point, ignore_none=True)
         return 1

@@ -18,8 +18,11 @@ make clean_venv && make setup
 
 ### Running Tests
 ```bash
-# Run all tests
+# Run all tests (now includes the pytest analysis/report suite)
 make -C test all
+
+# Run only the pytest analysis suite (28 tests, per-file; pytest is a dev dep)
+make -C test analysis
 
 # Run specific test category
 make -C test garmin_db       # Database tests
@@ -148,7 +151,8 @@ Critical settings:
 
 - Test files in `test/test_files/` contain sample FIT, TCX, and JSON data
 - Database tests create temporary databases
-- Use `make -C test verify_commit` before commits
+- Use `make -C test verify_commit` before commits (now also runs the pytest `analysis` suite)
+- The analysis/report suite is hermetic in CI: `make setup_repo` seeds the example config, so the 28 tests run without real data
 - All new functionality requires tests
 
 ## Common Issues
@@ -186,3 +190,4 @@ git submodule update
 - FIT file parsing is binary - use the fitfile submodule, don't parse manually
 - All timestamps are UTC in the database
 - The system preserves downloaded files to allow database rebuilds without re-downloading
+- Legacy Jupyter notebooks are archived under `docs/notebooks/` (unmaintained); the current analysis path is the markdown reports (`scripts/generate_report.py`)
