@@ -361,3 +361,14 @@ def test_days_and_weeks_to_race(tmp_path):
     report = b.build()
     assert report.days_to_race == days
     assert report.weeks_to_race == round(days / 7)   # 16, not floor 15
+
+
+def test_report_has_training_readiness_field(tmp_path):
+    """LongitudinalReport must expose training_readiness (empty result when table absent)."""
+    from garmindb.analysis.longitudinal_report import LongitudinalReport
+    assert 'training_readiness' in LongitudinalReport.__dataclass_fields__
+    # build() must not crash even when the readiness table is absent.
+    # The analyzer never raises — it returns an empty TrainingReadinessResult.
+    report = _builder(tmp_path, date(2025, 1, 1), date(2026, 6, 8)).build()
+    assert report.training_readiness is not None
+    assert report.training_readiness.day_count == 0
