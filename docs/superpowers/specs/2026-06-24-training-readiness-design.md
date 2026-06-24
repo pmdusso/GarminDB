@@ -1,4 +1,4 @@
-#needs-peer-review
+`#needs-peer-review`
 
 # SPEC: Training Readiness — fatia vertical (download → tabela → anamnese)
 
@@ -29,7 +29,7 @@ redundantes com a anamnese (VO2max na Seção 3, aclimatação na Seção 2b).
   **Sem nova dependência.**
 - **Forma real dos dados** (sondagem read-only de 2026-06-22, endpoint devolve uma
   **lista de ~3 leituras/dia**; estrutura plana):
-  ```
+  ```text
   calendarDate, timestamp, timestampLocal, deviceId,
   level='MODERATE', feedbackShort='RECOVERED_AND_READY', feedbackLong='MOD_RT_LOW_SS_GOOD_ACWR_NEG',
   score=69, sleepScore=89, sleepScoreFactorPercent=88,

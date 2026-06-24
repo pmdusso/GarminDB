@@ -48,7 +48,7 @@ The scripts are automated with [Make](https://www.gnu.org/software/make/manual/m
 
 There is more help on [using the program](https://github.com/tcgoetz/GarminDB/wiki/Usage) in the wiki.
 
-# Notebooks (archived) #
+# Notebooks (archived)
 
 Legacy Jupyter notebooks for analyzing data from the database were moved to `docs/notebooks/` (archived, unmaintained). The current path for analysis output is the markdown reports (`scripts/generate_report.py`). [Links](https://github.com/tcgoetz/GarminDB/wiki/Related-Projects#jupyter-notebooks) to user submitted notebooks can be found in the wiki.
 
