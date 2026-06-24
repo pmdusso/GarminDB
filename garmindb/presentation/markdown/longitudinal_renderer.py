@@ -506,7 +506,7 @@ class LongitudinalPresenter:
         lines.append(self._training_readiness(r))
         return "\n".join(lines) + "\n"
 
-    def _training_readiness(self, r) -> str:
+    def _training_readiness(self, r: LongitudinalReport) -> str:
         tr = getattr(r, "training_readiness", None)
         if tr is None or getattr(tr, "day_count", 0) == 0:
             return ""
