@@ -363,6 +363,17 @@ def test_days_and_weeks_to_race(tmp_path):
     assert report.weeks_to_race == round(days / 7)   # 16, not floor 15
 
 
+def test_training_readiness_none_when_analyzer_raises(tmp_path):
+    """Resilience contract: analyzer raising must yield None, not crash the report."""
+    from unittest.mock import patch
+    with patch(
+        "garmindb.analysis.readiness_analyzer.TrainingReadinessAnalyzer.analyze",
+        side_effect=RuntimeError("boom"),
+    ):
+        report = _builder(tmp_path, date(2025, 1, 1), date(2026, 6, 8)).build()
+    assert report.training_readiness is None
+
+
 def test_report_has_training_readiness_field(tmp_path):
     """LongitudinalReport must expose training_readiness (empty result when table absent)."""
     from garmindb.analysis.longitudinal_report import LongitudinalReport
