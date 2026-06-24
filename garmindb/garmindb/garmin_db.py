@@ -364,7 +364,16 @@ class TrainingReadiness(GarminDb.Base, idbutils.DbObject):
 
     db = GarminDb
     table_version = 1
-    _col_units = {'recovery_time': 'mins', 'acute_load': 'load'}
+    _col_units = {
+        'recovery_time': 'mins',
+        'acute_load': 'load',
+        'sleep_score_factor_pct': '%',
+        'acwr_factor_pct': '%',
+        'stress_history_factor_pct': '%',
+        'hrv_factor_pct': '%',
+        'sleep_history_factor_pct': '%',
+        'hrv_weekly_average': 'ms',
+    }
 
     day = Column(DateTime, primary_key=True)
     timestamp = Column(DateTime)
@@ -372,7 +381,7 @@ class TrainingReadiness(GarminDb.Base, idbutils.DbObject):
     level = Column(String)
     feedback_short = Column(String)
     feedback_long = Column(String)
-    recovery_time = Column(Integer)
+    recovery_time = Column(Integer)  # minutes (per the Garmin API)
     sleep_score = Column(Integer)
     sleep_score_factor_pct = Column(Integer)
     acwr_factor_pct = Column(Integer)

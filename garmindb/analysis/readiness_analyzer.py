@@ -1,8 +1,8 @@
 """Training Readiness longitudinal analysis from the garmin.db table.
 
 Reads the ``training_readiness`` table and produces a monthly mean score
-series plus the most recent days, for the clinical anamnesis. Never raises:
-returns an empty result on any DB problem (same contract as the decoupling
+series plus the most recent days, for the clinical anamnesis. Returns an
+empty result on any sqlite/DB-access error (same contract as the decoupling
 analyzer).
 """
 
@@ -97,7 +97,7 @@ def _parse_day(value) -> Optional[date]:
     return None
 
 
-def _monthly_mean(days: List[ReadinessDay], start: date, end: date):
+def _monthly_mean(days: List[ReadinessDay], start: date, end: date) -> List[Tuple[str, Optional[float]]]:
     buckets = {}
     for d in days:
         buckets.setdefault(f"{d.day.year:04d}-{d.day.month:02d}", []).append(d.score)
