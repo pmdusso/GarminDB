@@ -544,15 +544,11 @@ class GarminTrainingReadinessData(JsonFileProcessor):
         if not json_data:
             return 0
         readings = json_data if isinstance(json_data, list) else [json_data]
-        latest = max(readings, key=lambda r: r.get('timestamp') or '')
+        latest = max(readings, key=lambda r: r.get('timestamp') or datetime.datetime.min)
         day = latest.get('calendarDate')
         if day is None:
             return 0
-        if isinstance(day, str):
-            day = self._parse_date(day)
         ts = latest.get('timestamp')
-        if isinstance(ts, str):
-            ts = self._parse_date(ts)
         point = {
             'day': day.date() if hasattr(day, 'date') else day,
             'timestamp': ts,
