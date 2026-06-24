@@ -1,8 +1,8 @@
 ---
 report_type: anamnese_longitudinal
-generated: 2026-06-19T12:00:00
+generated: 2026-06-24T12:00:00
 period_start: 2025-01-01
-period_end: 2026-06-19
+period_end: 2026-06-24
 athlete: Pedro Dusso
 race: L'Étape Campos do Jordão 2026
 race_date: 2026-09-27
@@ -10,11 +10,11 @@ data_source: garmin_connect
 data_caveat: valores são estimativas de dispositivo (triagem, não diagnóstico); potência só quando há esforço qualificado (senão meta configurada)
 ---
 
-# 🩺 Anamnese esportiva — visão longitudinal 2025-01-01 a 2026-06-19
+# 🩺 Anamnese esportiva — visão longitudinal 2025-01-01 a 2026-06-24
 
 **Pedro Dusso** · 38 anos · masculino · 1,91 m  
-Prova-alvo: **L'Étape Campos do Jordão 2026** (2026-09-27) · **14 semanas** para a prova (100 dias)  
-Gerado em 19/06/2026 a partir do Garmin Connect.
+Prova-alvo: **L'Étape Campos do Jordão 2026** (2026-09-27) · **14 semanas** para a prova (95 dias)  
+Gerado em 24/06/2026 a partir do Garmin Connect.
 
 **Veredito geral:** 🟡 aptidão aeróbica em alta; sinais recentes de recuperação a vigiar — reavaliar em 1–2 semanas
 
@@ -23,19 +23,19 @@ Gerado em 19/06/2026 a partir do Garmin Connect.
 
 | Métrica | Atual | Base pessoal | Tendência | Série (2025→2026) |
 |---|---|---|---|---|
-| FC de repouso | 56 bpm | 52 (49–55) | ⬜ → | `▅▃▂▂▆▄▄▂▃▂▄▄▁▁▂▁▅█` |
-| VFC noturna (HRV) | 58 ms | 71 (58–83) | 🔴 ↓ | `▅▇█▆▃▄▄▅▅▆▄▅▆▇▅▅▃▁` |
+| FC de repouso | 57 bpm | 52 (49–55) | ⬜ → | `▅▃▂▂▆▄▄▂▃▂▄▄▁▁▂▁▄█` |
+| VFC noturna (HRV) | 59 ms | 71 (58–83) | 🔴 ↓ | `▅▇█▆▃▄▃▅▅▆▄▅▆▇▅▅▃▁` |
 | VO2max estimado (ciclismo) | 53 mL/kg/min | — | 🟢 ↑ | `▁▂▃·▃▃▂·▆▂▃█·▆··▆▂` |
 | VO2max estimado (corrida) | 54 mL/kg/min | — | 🟢 ↑ | `▁·▃·▂··▄▄·▄▂▂▂▃█·▄` |
-| Fitness (CTL) | 92 | — | ⬜ ↓ | `▁▇█▆▅▁▅▆▃▄▃▂▃▆▅▁▃▄` |
+| Fitness (CTL) | 98 | — | ⬜ ↓ | `▁▇█▆▅▁▅▆▃▄▃▂▃▆▅▁▃▅` |
 | Peso corporal | 85,7 kg | 87,4 | ⬜ → | `▅▅▅▅▇█▆▄▄▆▄▄▄▄▁▁▂·` |
-| Sono total | 6,8 h | 7,5 | ⬜ → | `▆▄▃▆▄▅█▄▂▅▃▄▆▅▆▄▆▁` |
-| Pontuação de sono | 75 /100 | 80 (69–91) | ⬜ → | `▆▆▆▇▄▅▇▆▅▆▁▅▇█▅▅▄▂` |
-| Estresse médio (Garmin) | 33 | 29 (22–36) | ⬜ → | `▅▆▄▄▅▂▄▂▃▄█▃▁▃▄▅▇▇` |
-| Body Battery (pico) | 63 | 80 (62–98) | ⬜ → | `▄▄▅▆▃▅▅▆▅▅▁▄█▇▅▄▂▁` |
-| SpO2 (saturação de O2) | 95,5 % | 95,2 (94,1–96,3) | ⬜ → | `▃▁▃▃▂▄▃▄▃▃▄▃▄▅▆▄█▅` |
+| Sono total | 6,9 h | 7,5 | ⬜ → | `▆▄▃▆▃▅█▄▁▅▂▄▆▄▆▄▆▁` |
+| Pontuação de sono | 74 /100 | 80 (69–91) | ⬜ → | `▆▆▆▇▄▅▇▆▅▆▁▅▇█▅▅▄▁` |
+| Estresse médio (Garmin) | 34 | 29 (22–36) | ⬜ → | `▅▆▄▄▅▂▄▂▃▄▇▃▁▃▄▅▇█` |
+| Body Battery (pico) | 61 | 80 (62–98) | ⬜ → | `▄▄▅▆▄▆▅▆▅▅▂▄█▇▅▄▂▁` |
+| SpO2 (saturação de O2) | 95,4 % | 95,2 (94,1–96,3) | ⬜ → | `▃▁▃▃▂▄▃▄▃▃▄▃▄▅▆▄█▄` |
 | Freq. respiratória (repouso) | 14,6 rpm | 14,2 (13,2–15,3) | ⬜ → | `▄▅▆▂▇▃▂▁█▁▅▅▂▄▂▂▆▇` |
-| Forma atual (TSB) | -14 | CTL 92 / ATL 106 | — | — |
+| Forma atual (TSB) | 18 | CTL 98 / ATL 80 | — | — |
 
 
 ## 🚩 Sinais de alerta (triagem — ordenados por prioridade)
@@ -48,19 +48,19 @@ Gerado em 19/06/2026 a partir do Garmin Connect.
 
 ### ⚠️ FC de repouso acima da faixa pessoal
 
-- **Achado:** FC repouso atual 56 bpm vs faixa 49–55 bpm
+- **Achado:** FC repouso atual 57 bpm vs faixa 49–55 bpm
 - **Interpretação:** Elevação da FC de repouso acima da base é sinal de fadiga acumulada. Confundidores: doença, calor, álcool, desidratação.
 - **Conduta sugerida:** Cruzar com VFC e sono; reduzir carga se persistir após descanso.
 
 ### ⚠️ Teto de Body Battery em queda
 
-- **Achado:** Pico de Body Battery atual 63 vs 76 no início do período
+- **Achado:** Pico de Body Battery atual 61 vs 76 no início do período
 - **Interpretação:** Pico de recarga noturna em declínio sugere recuperação noturna incompleta / débito de recuperação.
 - **Conduta sugerida:** Avaliar volume de sono e carga das últimas semanas.
 
 ### ℹ️ Sono abaixo do alvo
 
-- **Achado:** Sono do mês atual 6.8 h (< 7 h)
+- **Achado:** Sono do mês atual 6.9 h (< 7 h)
 - **Interpretação:** Sono é o principal substrato de recuperação; déficit crônico reduz adaptação e eleva risco de lesão/doença.
 - **Conduta sugerida:** Mirar ≥7–8 h e regularidade de horário.
 
@@ -75,23 +75,23 @@ Gerado em 19/06/2026 a partir do Garmin Connect.
 - **Antropometria:** 1,91 m · 85,7 kg · IMC 23,5 (peso = mediana das pesagens recentes)
 - **Esporte principal:** ciclismo (foco), corrida e força como complemento
 - **Prova-alvo:** L'Étape Campos do Jordão 2026 em 2026-09-27 — gran fondo de montanha; **14 semanas** a partir desta data
-- **Carga atual:** CTL (fitness) 92 · ATL (fadiga) 106 · TSB (forma) -14
+- **Carga atual:** CTL (fitness) 98 · ATL (fadiga) 80 · TSB (forma) 18
 
 **Totais por ano (no período do relatório):**
 
 | Ano | Atividades | Dias ativos | Distância | Horas | Subida | Calorias |
 |---|---|---|---|---|---|---|
 | 2025 | 269 | 242 | 10314 km | 478 h | 88517 m | 293.745 |
-| 2026 | 129 | 118 | 4704 km | 200 h | 26231 m | 135.368 |
+| 2026 | 131 | 120 | 4857 km | 206 h | 28038 m | 139.283 |
 
 
 ## 2. Cardiovascular / autonômico
 
 Janela longitudinal mais sensível para equilíbrio autonômico e recuperação. FC de repouso e VFC interpretadas contra a **base pessoal**, não contra a população.
 
-- **FC de repouso** ⬜ → — atual 56 bpm, base 52 (49–55), faixa 50–56 `▅▃▂▂▆▄▄▂▃▂▄▄▁▁▂▁▅█`
-- **VFC noturna (HRV)** 🔴 ↓ — atual 58 ms, base 71 (58–83), faixa 58–76 `▅▇█▆▃▄▄▅▅▆▄▅▆▇▅▅▃▁`
-- **Estresse médio (Garmin)** ⬜ → — atual 33, base 29 (22–36), faixa 25–33 `▅▆▄▄▅▂▄▂▃▄█▃▁▃▄▅▇▇`
+- **FC de repouso** ⬜ → — atual 57 bpm, base 52 (49–55), faixa 50–57 `▅▃▂▂▆▄▄▂▃▂▄▄▁▁▂▁▄█`
+- **VFC noturna (HRV)** 🔴 ↓ — atual 59 ms, base 71 (58–83), faixa 59–76 `▅▇█▆▃▄▃▅▅▆▄▅▆▇▅▅▃▁`
+- **Estresse médio (Garmin)** ⬜ → — atual 34, base 29 (22–36), faixa 25–34 `▅▆▄▄▅▂▄▂▃▄▇▃▁▃▄▅▇█`
 
 | Mês | FC rep. (bpm) | VFC noturna (ms) | VFC média semanal (ms) | Estresse |
 |---|---|---|---|---|
@@ -112,11 +112,11 @@ Janela longitudinal mais sensível para equilíbrio autonômico e recuperação.
 | 2026-03 | 51 | 69 | 42 | 29 |
 | 2026-04 | 50 | 71 | 43 | 30 |
 | 2026-05 | 54 | 65 | 36 | 33 |
-| 2026-06 | 56 | 58 | 34 | 33 |
+| 2026-06 | 57 | 59 | 35 | 34 |
 
-_523 noites medidas; VFC = média noturna rMSSD (estimativa de pulso, não chest-strap)._
+_527 noites medidas; VFC = média noturna rMSSD (estimativa de pulso, não chest-strap)._
 
-- **Status VFC (Garmin):** equilibrado · 31% dos últimos 30 dias em equilíbrio. Categoria do próprio Garmin; os limites de referência do fabricante (baseline_low/high) vêm de um algoritmo interno cuja faixa não contém a própria média da VFC noturna exibida acima — por isso não são plotados como faixa.
+- **Status VFC (Garmin):** baixo · 43% dos últimos 30 dias em equilíbrio. Categoria do próprio Garmin; os limites de referência do fabricante (baseline_low/high) vêm de um algoritmo interno cuja faixa não contém a própria média da VFC noturna exibida acima — por isso não são plotados como faixa.
 
 - **FC máx operacional** (p95 das atividades, descarta spike de sensor): ciclismo ~183 bpm · corrida ~189 bpm — **não** é FC máx de teste com cinta; usar só para contextualizar zonas.
 
@@ -125,7 +125,7 @@ _523 noites medidas; VFC = média noturna rMSSD (estimativa de pulso, não chest
 
 SpO2 (saturação periférica de O2) e frequência respiratória de repouso ajudam a triar tolerância a altitude e carga respiratória/estresse. Estimativas ópticas de pulso — triagem, não oximetria clínica.
 
-- **SpO2 (saturação de O2)** ⬜ → — atual 95,5 %, base 95,2 (94,1–96,3), faixa 94,4–96,4 `▃▁▃▃▂▄▃▄▃▃▄▃▄▅▆▄█▅`
+- **SpO2 (saturação de O2)** ⬜ → — atual 95,4 %, base 95,2 (94,1–96,3), faixa 94,4–96,4 `▃▁▃▃▂▄▃▄▃▃▄▃▄▅▆▄█▄`
 - **Freq. respiratória (repouso)** ⬜ → — atual 14,6 rpm, base 14,2 (13,2–15,3), faixa 13,9–14,7 `▄▅▆▂▇▃▂▁█▁▅▅▂▄▂▂▆▇`
 
 | Mês | SpO2 (%) | FR repouso (rpm) |
@@ -147,11 +147,11 @@ SpO2 (saturação periférica de O2) e frequência respiratória de repouso ajud
 | 2026-03 | 95,8 | 14,0 |
 | 2026-04 | 95,5 | 14,1 |
 | 2026-05 | 96,4 | 14,5 |
-| 2026-06 | 95,5 | 14,6 |
+| 2026-06 | 95,4 | 14,6 |
 
-_528 dias medidos no período — relevante para aclimatação a altitude (prova de montanha); estimativa óptica de pulso._
+_531 dias medidos no período — relevante para aclimatação a altitude (prova de montanha); estimativa óptica de pulso._
 
-_533 dias medidos no período — FR de repouso elevada acompanha estresse/doença/overreaching._
+_536 dias medidos no período — FR de repouso elevada acompanha estresse/doença/overreaching._
 
 
 ## 3. Aptidão aeróbica / performance
@@ -160,7 +160,7 @@ Confirma adaptação ao treino e serve de eixo objetivo para interpretar a fadig
 
 - **VO2max estimado (ciclismo)** 🟢 ↑ — atual 53 mL/kg/min, base —, faixa 52–57 `▁▂▃·▃▃▂·▆▂▃█·▆··▆▂`
 - **VO2max estimado (corrida)** 🟢 ↑ — atual 54 mL/kg/min, base —, faixa 50–58 `▁·▃·▂··▄▄·▄▂▂▂▃█·▄`
-- **Training Effect anaeróbico** ⬜ ↓ — atual 1,2, base —, faixa 0,9–1,6 `▄▇█▅▃▃▆▆▇▆▄▄▂▄▄▁▅▃`
+- **Training Effect anaeróbico** ⬜ ↓ — atual 1,3, base —, faixa 0,9–1,6 `▄▇█▅▃▃▆▆▇▆▄▄▂▄▄▁▅▅`
 
 | Mês | VO2max ciclismo | VO2max corrida | TE anaeróbico |
 |---|---|---|---|
@@ -181,9 +181,9 @@ Confirma adaptação ao treino e serve de eixo objetivo para interpretar a fadig
 | 2026-03 | — | 53 | 1,2 |
 | 2026-04 | — | 58 | 0,9 |
 | 2026-05 | 56 | — | 1,3 |
-| 2026-06 | 53 | 54 | 1,2 |
+| 2026-06 | 53 | 54 | 1,3 |
 
-_392 atividades com TE anaeróbico; escala 0–5 (estímulo de alta intensidade), complementa o TE aeróbico._
+_394 atividades com TE anaeróbico; escala 0–5 (estímulo de alta intensidade), complementa o TE aeróbico._
 
 _Cada célula mensal é a **melhor** estimativa (máximo) do mês (o Garmin emite uma estimativa por atividade); '—' = sem leitura no mês. As demais séries do relatório usam médias mensais._
 
@@ -194,7 +194,7 @@ _Cada célula mensal é a **melhor** estimativa (máximo) do mês (o Garmin emit
 - W·kg configurado = 325 ÷ 85,7 kg = **3,79 W/kg** (meta 4,0)
 - Peso-alvo de prova: 80 kg
 
-_Cobertura de potência: 609 pedais com dados nos arquivos de resumo._
+_Cobertura de potência: 611 pedais com dados nos arquivos de resumo._
 
 ### Durabilidade aeróbica (desacoplamento FC:velocidade)
 
@@ -219,17 +219,17 @@ EF = velocidade/FC; desacoplamento = (EF 1ª metade − 2ª metade)/EF 1ª metad
 | 2026-03 | 7.4% | 0,206 |
 | 2026-04 | 7.1% | 0,217 |
 | 2026-05 | 9.0% | 0,199 |
-| 2026-06 | 9.1% | 0,196 |
+| 2026-06 | 8.8% | 0,200 |
 
 **Pedaladas recentes:**
 
+- 2026-06-21: desacoplamento 7.5% · EF 0.220
 - 2026-06-14: desacoplamento 2.7% · EF 0.194
 - 2026-06-10: desacoplamento 9.9% · EF 0.192
-- 2026-06-09: desacoplamento 9.4% · EF 0.201
 
-_38 pedalada(s) elegível(is) descartada(s) por variabilidade alta._
+_39 pedalada(s) elegível(is) descartada(s) por variabilidade alta._
 
-_193 pedalada(s) analisada(s); métrica válida para esforço estável sub-limiar; aquecimento e paradas removidos._
+_194 pedalada(s) analisada(s); métrica válida para esforço estável sub-limiar; aquecimento e paradas removidos._
 
 ### Durabilidade aeróbica (desacoplamento potência:FC)
 
@@ -254,31 +254,31 @@ EF = potência/FC; desacoplamento = (EF 1ª metade − 2ª metade)/EF 1ª metade
 | 2026-03 | 7.5% | 1,387 |
 | 2026-04 | 3.2% | 1,540 |
 | 2026-05 | 8.3% | 1,380 |
-| 2026-06 | 10.8% | 1,303 |
+| 2026-06 | 10.6% | 1,314 |
 
 **Pedaladas recentes:**
 
+- 2026-06-21 (outdoor): desacoplamento 8.5% · 184 W · EF 1.387
 - 2026-06-18 (indoor): desacoplamento 15.5% · 203 W · EF 1.208
 - 2026-06-16 (indoor): desacoplamento 10.1% · 198 W · EF 1.355
-- 2026-06-14 (outdoor): desacoplamento 5.6% · 190 W · EF 1.190
 
-_38 pedalada(s) outdoor descartada(s) por variabilidade alta._
+_39 pedalada(s) outdoor descartada(s) por variabilidade alta._
 
-_210 pedalada(s) com potência; rides indoor entram sem porta de estabilidade; aquecimento removido._
+_211 pedalada(s) com potência; rides indoor entram sem porta de estabilidade; aquecimento removido._
 
 
 ## 4. Carga de treino, periodização e segurança da rampa
 
 CTL = fitness (carga crônica 42d), ATL = fadiga (aguda 7d), TSB = forma (CTL−ATL). Carga derivada do `training_load` do Garmin (proxy de TSS; carga não ponderada por potência).
 
-- **Fitness (CTL)** ⬜ ↓ — atual 92, base —, faixa 66–121 `▁▇█▆▅▁▅▆▃▄▃▂▃▆▅▁▃▄`
+- **Fitness (CTL)** ⬜ ↓ — atual 98, base —, faixa 66–121 `▁▇█▆▅▁▅▆▃▄▃▂▃▆▅▁▃▅`
 
-- **ACWR (7d:28d):** 1,46 (faixa de menor risco 0,8–1,3)
-- **Monotonia (28d):** 0,88 (>2,0 = monótono)
-- **Rampa de CTL:** 2,5/semana (guia ~3–8)
+- **ACWR (7d:28d):** 1,34 (faixa de menor risco 0,8–1,3)
+- **Monotonia (28d):** 0,79 (>2,0 = monótono)
+- **Rampa de CTL:** 3,2/semana (guia ~3–8)
 - **Confiança da carga:** 99% medida pelo dispositivo
 
-> ℹ️ O mês atual está incompleto (dados até 2026-06-19). A queda recente de CTL reflete uma semana de baixo volume/descarga, não destreino — ACWR, rampa e monotonia acima estão em faixa segura, e o fitness deve reconstruir na fase de build.
+> ℹ️ O mês atual está incompleto (dados até 2026-06-24). A queda recente de CTL reflete uma semana de baixo volume/descarga, não destreino — ACWR, rampa e monotonia acima estão em faixa segura, e o fitness deve reconstruir na fase de build.
 
 | Mês | CTL | ATL | TSB | Carga total | Horas |
 |---|---|---|---|---|---|
@@ -299,17 +299,39 @@ CTL = fitness (carga crônica 42d), ATL = fadiga (aguda 7d), TSB = forma (CTL−
 | 2026-03 | 99 | 96 | 3 | 2895 | 37,2 |
 | 2026-04 | 70 | 26 | 44 | 2229 | 25,4 |
 | 2026-05 | 82 | 64 | 18 | 3014 | 34,8 |
-| 2026-06 | 92 | 106 | -14 | 1771 | 19,0 |
+| 2026-06 | 98 | 80 | 18 | 2425 | 24,7 |
+
+### Prontidão de treino (Training Readiness)
+
+Score diário 0–100 do Garmin combinando sono, recuperação, VFC, histórico de stress/sono e carga aguda. Síntese matinal de prontidão (triagem, não diagnóstico).
+
+| Mês | Score médio |
+|---|---|
+| 2026-06 | 41,1 |
+
+**Dias recentes:**
+
+| Dia | Score | Nível | Recuperação (min) | Feedback |
+|---|---|---|---|---|
+| 2026-06-23 | 84 | HIGH | 0 | RESTED_AND_READY |
+| 2026-06-22 | 69 | MODERATE | 101 | RECOVERED_AND_READY |
+| 2026-06-21 | 27 | LOW | 1153 | LISTEN_TO_YOUR_BODY |
+| 2026-06-20 | 52 | MODERATE | 476 | BOOSTED_BY_NAPPING |
+| 2026-06-19 | 38 | LOW | 122 | FIND_TIME_TO_RELAX |
+| 2026-06-18 | 75 | HIGH | 366 | WELL_RECOVERED |
+| 2026-06-17 | 25 | LOW | 2287 | HIGH_RECOVERY_NEEDS |
+
+_20 dia(s) com leitura de prontidão no período._
 
 
 ## 5. Recuperação: sono e Body Battery
 
 Sono é o principal substrato de recuperação; o teto de Body Battery integra carga e recuperação num único proxy de reserva energética.
 
-- **Sono total** ⬜ → — atual 6,8 h, base 7,5, faixa 6,8–8,0 `▆▄▃▆▄▅█▄▂▅▃▄▆▅▆▄▆▁`
-- **Pontuação de sono** ⬜ → — atual 75 /100, base 80 (69–91), faixa 73–83 `▆▆▆▇▄▅▇▆▅▆▁▅▇█▅▅▄▂`
-- **Body Battery (pico)** ⬜ → — atual 63, base 80 (62–98), faixa 63–90 `▄▄▅▆▃▅▅▆▅▅▁▄█▇▅▄▂▁`
-- **Body Battery (recarga noturna)** 🔴 ↓ — atual 42, base 56 (40–72), faixa 42–61 `▅▇▆▆▄▅▅▅▆▆▃▅█▇▆▅▂▁`
+- **Sono total** ⬜ → — atual 6,9 h, base 7,5, faixa 6,9–8,0 `▆▄▃▆▃▅█▄▁▅▂▄▆▄▆▄▆▁`
+- **Pontuação de sono** ⬜ → — atual 74 /100, base 80 (69–91), faixa 73–83 `▆▆▆▇▄▅▇▆▅▆▁▅▇█▅▅▄▁`
+- **Body Battery (pico)** ⬜ → — atual 61, base 80 (62–98), faixa 61–90 `▄▄▅▆▄▆▅▆▅▅▂▄█▇▅▄▂▁`
+- **Body Battery (recarga noturna)** 🔴 ↓ — atual 43, base 56 (40–72), faixa 43–61 `▅▇▆▆▄▅▅▅▅▆▃▅█▇▆▅▂▁`
 
 | Mês | Sono (h) | Pont. sono | BB pico | BB recarga |
 |---|---|---|---|---|
@@ -330,7 +352,7 @@ Sono é o principal substrato de recuperação; o teto de Body Battery integra c
 | 2026-03 | 7,7 | 79 | 80 | 58 |
 | 2026-04 | 7,5 | 79 | 76 | 55 |
 | 2026-05 | 7,7 | 78 | 68 | 47 |
-| 2026-06 | 6,8 | 75 | 63 | 42 |
+| 2026-06 | 6,9 | 74 | 61 | 43 |
 
 **Arquitetura do sono (médias mensais):**
 
@@ -353,7 +375,7 @@ Sono é o principal substrato de recuperação; o teto de Body Battery integra c
 | 2026-03 | 1,4 | 5,1 | 1,3 | 0,2 | 18 |
 | 2026-04 | 1,3 | 5,1 | 1,4 | 0,3 | 19 |
 | 2026-05 | 1,3 | 5,3 | 1,3 | 0,2 | 22 |
-| 2026-06 | 1,1 | 5,4 | 1,2 | 0,2 | 24 |
+| 2026-06 | 1,1 | 5,4 | 1,2 | 0,1 | 25 |
 
 _Estágios de sono e estresse são estimativas do dispositivo (não polissonografia); úteis como tendência de qualidade._
 
@@ -363,7 +385,7 @@ _Estágios de sono e estresse são estimativas do dispositivo (não polissonogra
 Triagem de RED-S (baixa disponibilidade energética): perda rápida ou sustentada de peso sob alta carga é o principal sinal de alerta.
 
 - **Peso atual:** 85,7 kg (mediana das pesagens recentes) · base 87,4 · faixa 84,5–89,6 kg `▅▅▅▅▇█▆▄▄▆▄▄▄▄▁▁▂·`
-- Variação no período: 87,8 → 85,7 kg (−2,2 kg, -2,5%)
+- Variação no período: 87,8 → 85,7 kg (−2,1 kg, -2,4%)
 - IMC atual ~23,5 (peso 85,7 kg / altura 1,91 m)
 - _81 pesagens no período (~4/mês) — tendência direcional, não granular_
 
@@ -412,7 +434,7 @@ Visão de periodização: volume mês a mês e divisão por esporte. Permite ver
 
 | Esporte | Atividades | Distância | Horas | Subida |
 |---|---|---|---|---|
-| ciclismo | 83 | 4490 km | 163,9 h | 23241 m |
+| ciclismo | 85 | 4643 km | 169,6 h | 25048 m |
 | musculação | 23 | 0 km | 15,3 h | 0 m |
 | corrida | 22 | 210 km | 20,2 h | 2800 m |
 | caminhada | 1 | 5 km | 1,1 h | 190 m |
@@ -438,9 +460,9 @@ Visão de periodização: volume mês a mês e divisão por esporte. Permite ver
 | 2026-03 | 23 | 890 km | 37,2 h | 3019 m | 2895 | 3,11 |
 | 2026-04 | 23 | 471 km | 25,4 h | 4269 m | 2229 | 2,41 |
 | 2026-05 | 23 | 871 km | 34,8 h | 5645 m | 3014 | 3,00 |
-| 2026-06 | 15 | 397 km | 19,0 h | 1447 m | 1771 | 2,85 |
+| 2026-06 | 17 | 550 km | 24,7 h | 3254 m | 2425 | 3,00 |
 
-Distância mensal: `▄▆▆▅▄▂▅▅▂▄▆▁▄█▄▁▄▁` · Horas mensais: `▄▇█▅▆▄▅▆▄▄▅▂▄▇▄▂▄▁`
+Distância mensal: `▄▆▆▅▄▁▄▅▂▄▆▁▃█▄▁▄▁` · Horas mensais: `▃▇█▅▅▄▅▆▃▃▅▁▃▇▄▁▃▁`
 
 
 ## 8. História clínica — a completar pelo médico

@@ -30,7 +30,9 @@ ANALYSIS_SAFE=test_activity_analyzer test_recovery_analyzer test_sleep_analyzer 
   test_longitudinal_power_phase1 test_markdown_presenter test_report_state \
   test_repositories test_sqlite_repository test_data_models test_db_metrics \
   test_integration test_weight_series test_download_auth_adapter \
-  test_garmin_connect_auth_adapter test_power_import_phase2_sp1
+  test_garmin_connect_auth_adapter test_power_import_phase2_sp1 \
+  test_readiness_analyzer test_training_readiness_db test_training_readiness_download \
+  test_training_readiness_import test_training_readiness_cli_smoke
 
 # Reserved for tests that require REAL downloaded data (~/HealthData DBs the CI
 # runner does not have). None currently -- the example config + empty DBs satisfy
