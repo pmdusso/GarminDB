@@ -544,7 +544,11 @@ class GarminTrainingReadinessData(JsonFileProcessor):
         if not json_data:
             return 0
         readings = json_data if isinstance(json_data, list) else [json_data]
-        latest = max(readings, key=lambda r: r.get('timestamp') or datetime.datetime.min)
+        # Pick the latest intra-day reading by timestamp. Readings with a
+        # timestamp sort ahead of those without (None), and same-type datetimes
+        # are compared among themselves -- this avoids a TypeError from mixing a
+        # converted (possibly tz-aware) datetime with a naive sentinel fallback.
+        latest = max(readings, key=lambda r: (r.get('timestamp') is not None, r.get('timestamp')))
         day = latest.get('calendarDate')
         if day is None:
             return 0
