@@ -59,6 +59,11 @@ def main():
         help="Generate the longitudinal anamnesis report (2025-2026 trends, "
              "totals, red-flag screen) for a sports-medicine review",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON instead of markdown",
+    )
 
     args = parser.parse_args()
 
@@ -92,9 +97,13 @@ def main():
             activities_dir=acts_dir,
         )
         report = builder.build()
-        markdown = LongitudinalPresenter(
-            include_metadata=not args.no_metadata
-        ).render(report)
+        if args.json:
+            from garmindb.presentation.json import render_json
+            output = render_json(report)
+        else:
+            output = LongitudinalPresenter(
+                include_metadata=not args.no_metadata
+            ).render(report)
     elif args.performance:
         import os
         from datetime import datetime as _dt
@@ -132,9 +141,13 @@ def main():
         # last-known value forward instead of destroying the baseline.
         merged = merge_metrics(last, report.metric_snapshot)
         save_metrics(state_path, merged, generated.isoformat())
-        markdown = PerformancePresenter(
-            include_metadata=not args.no_metadata
-        ).render(report)
+        if args.json:
+            from garmindb.presentation.json import render_json
+            output = render_json(report)
+        else:
+            output = PerformancePresenter(
+                include_metadata=not args.no_metadata
+            ).render(report)
     else:
         from garmindb.data.repositories import SQLiteHealthRepository
         from garmindb.analysis import HealthAnalyzer
@@ -151,14 +164,18 @@ def main():
             report = analyzer.monthly_report()
         else:
             report = analyzer.weekly_report()
-        markdown = presenter.render_report(report)
+        if args.json:
+            from garmindb.presentation.json import render_json
+            output = render_json(report)
+        else:
+            output = presenter.render_report(report)
 
     # Output
     if args.output:
-        args.output.write_text(markdown)
+        args.output.write_text(output)
         print(f"Report saved to: {args.output}")
     else:
-        print(markdown)
+        print(output)
 
 
 if __name__ == "__main__":

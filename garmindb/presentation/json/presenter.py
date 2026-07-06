@@ -6,23 +6,40 @@ from datetime import date, datetime, time, timedelta
 from enum import Enum
 
 
+def _sanitize(obj):
+    """Recursively convert non-JSON-native types in a value tree.
+
+    Handles date/datetime keys (→ ISO string), timedelta values (→ seconds),
+    Enum values (→ .value), and nested dicts/lists.
+    """
+    if isinstance(obj, dict):
+        return {
+            (k.isoformat() if isinstance(k, (date, datetime, time)) else k):
+            _sanitize(v)
+            for k, v in obj.items()
+        }
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, time):
+        return obj.isoformat()
+    if isinstance(obj, timedelta):
+        return obj.total_seconds()
+    if isinstance(obj, Enum):
+        return obj.value
+    return obj
+
+
 class ReportEncoder(json.JSONEncoder):
     """Custom JSON encoder for GarminDB report dataclass trees.
-    
+
     Handles: date/datetime → ISO string, time → ISO string,
     timedelta → total_seconds, Enum → .value,
     @dataclass → dict (with computed @property inclusion).
     """
 
     def default(self, obj):
-        if isinstance(obj, (datetime, date)):
-            return obj.isoformat()
-        if isinstance(obj, time):
-            return obj.isoformat()
-        if isinstance(obj, timedelta):
-            return obj.total_seconds()
-        if isinstance(obj, Enum):
-            return obj.value
         if dataclasses.is_dataclass(obj) and not isinstance(obj, type):
             d = dataclasses.asdict(obj)
             # Include computed @property values (e.g. trend_icon, severity_icon, sparkline)
@@ -33,7 +50,15 @@ class ReportEncoder(json.JSONEncoder):
                         d[attr_name] = getattr(obj, attr_name)
                     except Exception:
                         pass
-            return d
+            return _sanitize(d)
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        if isinstance(obj, time):
+            return obj.isoformat()
+        if isinstance(obj, timedelta):
+            return obj.total_seconds()
+        if isinstance(obj, Enum):
+            return obj.value
         return super().default(obj)
 
 
