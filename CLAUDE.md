@@ -188,6 +188,6 @@ git submodule update
 - The project uses submodules (Fit, Tcx, utilities) that must be initialized
 - Database operations are atomic - use transactions for consistency
 - FIT file parsing is binary - use the fitfile submodule, don't parse manually
-- All timestamps are UTC in the database
+- Timestamps are stored in **local time**, not UTC — the import pipeline converts via `utc_datetime_to_local` before writing (e.g. `monitoring_hr` ends at `23:59:59` of the local day). Do not reconvert `timestamp`/`start`/`end` columns; `day`/`first_day` are local dates. See `docs/catalogo-dados-garmindb.md`
 - The system preserves downloaded files to allow database rebuilds without re-downloading
 - Legacy Jupyter notebooks are archived under `docs/notebooks/` (unmaintained); the current analysis path is the markdown reports (`scripts/generate_report.py`)
