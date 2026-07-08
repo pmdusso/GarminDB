@@ -184,8 +184,34 @@ def test_carga_performance_uses_official_connect_metrics(tmp_path):
 
     assert any(h["label"] == "Status Garmin" and h["value"] == "Mantendo" for h in carga["hero"])
     assert {"label": "Endurance Score", "current": 7422, "target": None, "unit": ""} in carga["scorecard"]
-    assert {"label": "Aeróbico baixo", "current": 491, "target": 526, "unit": ""} in carga["scorecard"]
     assert any(i["title"] == "Foco de carga Garmin" and "aeróbica baixa" in i["body"] for i in carga["insights"])
+
+    ts = carga["training_status"]
+    assert ts["status"] == {"label": "Mantendo", "level": "good", "note": "oficial Garmin Connect"}
+    assert ts["vo2max"] == {"value": 51.0, "unit": "ml/kg/min"}
+    assert ts["acute_load"] == {
+        "value": 1068, "chronic": 841, "ratio": 1.2,
+        "band_low": 0.8, "band_high": 1.3, "level": "good",
+    }
+    assert ts["hrv"]["value_ms"] == 52
+    assert ts["hrv"]["label_pt"] == "Equilibrado"
+    assert ts["hrv"]["level"] == "good"
+    load_focus = {row["label"]: row for row in ts["load_focus"]}
+    assert load_focus["Aeróbico baixo"] == {
+        "label": "Aeróbico baixo", "current": 491, "target_min": 526, "target_max": 1179,
+    }
+    assert load_focus["Aeróbico alto"] == {
+        "label": "Aeróbico alto", "current": 2032, "target_min": 670, "target_max": 1323,
+    }
+    assert load_focus["Anaeróbico"] == {
+        "label": "Anaeróbico", "current": 755, "target_min": 217, "target_max": 652,
+    }
+
+    scorecard_labels = {row["label"] for row in carga["scorecard"]}
+    assert "VO2max bike" not in scorecard_labels
+    assert "Aeróbico baixo" not in scorecard_labels
+    assert "Aeróbico alto" not in scorecard_labels
+    assert "Anaeróbico" not in scorecard_labels
 
     dump = json.dumps(carga, ensure_ascii=False)
     assert "device-123" not in dump
