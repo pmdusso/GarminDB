@@ -281,14 +281,13 @@ def _hrv_status_pt(status, value, baseline_low, baseline_upper):
 
 
 def _build_training_status_panel(db_dir, end, official_status, official_load, vo2max_value, status_label, status_level):
-    if not status_label and not official_load and vo2max_value is None:
+    hrv_rows = daily_hrv_series(db_dir, end - _dt.timedelta(days=BASELINE_DAYS), end)
+    hrv_last = hrv_rows[-1] if hrv_rows else None
+    if not status_label and not official_load and vo2max_value is None and not hrv_last:
         return None
     acute = official_status.get("acuteTrainingLoadDTO") or {}
     acute_value = _number(acute.get("dailyTrainingLoadAcute"))
     acute_ratio = acute.get("dailyAcuteChronicWorkloadRatio")
-
-    hrv_rows = daily_hrv_series(db_dir, end - _dt.timedelta(days=BASELINE_DAYS), end)
-    hrv_last = hrv_rows[-1] if hrv_rows else None
     hrv_label, hrv_level = _hrv_status_pt(
         hrv_last.get("status") if hrv_last else None,
         hrv_last.get("weekly_avg") if hrv_last else None,

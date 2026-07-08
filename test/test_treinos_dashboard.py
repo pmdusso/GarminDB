@@ -243,3 +243,33 @@ def test_build_dashboard_empty_db_gracefully_returns_four_groups(tmp_path):
         assert group["main_chart"] is None
         assert group["charts"] == []
         assert group["insights"] == []
+
+
+def test_training_status_panel_renders_with_hrv_only_data(tmp_path):
+    """HRV-only data (no official status/load/VO2max) should still produce training_status panel."""
+    _mk_dbs(tmp_path)
+
+    # Strip out official Garmin metrics to test HRV-only case
+    garmin = sqlite3.connect(tmp_path / "garmin.db")
+    garmin.execute("DELETE FROM connect_metric_raw")
+    garmin.commit()
+    garmin.close()
+
+    # Strip out VO2max to ensure vo2max_value is None
+    activities = sqlite3.connect(tmp_path / "garmin_activities.db")
+    activities.execute("DELETE FROM cycle_activities")
+    activities.commit()
+    activities.close()
+
+    carga = build_dashboard(db_dir=str(tmp_path), period_end=END)["carga-performance"]
+
+    # training_status should NOT be None even without official Garmin data
+    assert carga["training_status"] is not None
+    # HRV data should be present
+    assert carga["training_status"]["hrv"] is not None
+    assert carga["training_status"]["hrv"]["value_ms"] == 52
+    assert carga["training_status"]["hrv"]["label_pt"] == "Equilibrado"
+    # Official data should be absent
+    assert carga["training_status"]["status"] is None
+    assert carga["training_status"]["vo2max"] is None
+    assert carga["training_status"]["acute_load"] is None
