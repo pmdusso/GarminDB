@@ -9,11 +9,15 @@ import sys
 import logging
 import datetime
 import enum
+import json
+import os
+import re
 
 import fitfile
 from idbutils import JsonFileProcessor, Conversions
+from idbutils.file_processor import FileProcessor
 
-from .garmindb import GarminDb, Attributes, Weight, Sleep, SleepEvents, RestingHeartRate, DailySummary, Hrv, TrainingReadiness
+from .garmindb import GarminDb, Attributes, Weight, Sleep, SleepEvents, RestingHeartRate, DailySummary, Hrv, TrainingReadiness, ConnectMetricRaw
 from .fit_data import FitData
 
 
@@ -572,3 +576,44 @@ class GarminTrainingReadinessData(JsonFileProcessor):
         }
         TrainingReadiness.insert_or_update(self.garmin_db, point, ignore_none=True)
         return 1
+
+
+class GarminConnectMetricRawData:
+    """Import raw Garmin Connect metric JSON files into one private table."""
+
+    def __init__(self, db_params, input_dir, metric, file_regex, latest, debug):
+        self.metric = metric
+        self.debug = debug
+        self.garmin_db = GarminDb(db_params)
+        self.file_names = FileProcessor.dir_to_files(input_dir, file_regex, latest) if input_dir else []
+        self.total_updates = 0
+
+    def file_count(self):
+        return len(self.file_names)
+
+    def _period_from_file(self, filename):
+        dates = re.findall(r'\d{4}-\d{2}-\d{2}', os.path.basename(filename or ''))
+        if len(dates) >= 2:
+            return dates[0], dates[1], 'range'
+        if len(dates) == 1:
+            return dates[0], dates[0], 'daily'
+        return '', '', 'raw'
+
+    def _process_json(self, json_data, period_start='', period_end='', granularity='raw'):
+        point = {
+            'metric': self.metric,
+            'period_start': period_start,
+            'period_end': period_end,
+            'granularity': granularity,
+            'payload_json': json.dumps(json_data, ensure_ascii=False, sort_keys=True, separators=(',', ':')),
+            'imported_at': datetime.datetime.now(),
+        }
+        ConnectMetricRaw.insert_or_update(self.garmin_db, point, ignore_none=True)
+        return 1
+
+    def process(self):
+        for filename in self.file_names:
+            with open(filename, encoding='utf-8') as f:
+                payload = json.load(f)
+            period_start, period_end, granularity = self._period_from_file(filename)
+            self.total_updates += self._process_json(payload, period_start, period_end, granularity)

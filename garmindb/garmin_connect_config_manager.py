@@ -148,6 +148,30 @@ class GarminConnectConfigManager(JsonConfig):
         """Return the configured directory of where the training readiness files will be stored."""
         return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'TrainingReadiness')
 
+    def get_training_status_dir(self):
+        return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'TrainingStatus')
+
+    def get_endurance_score_dir(self):
+        return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'EnduranceScore')
+
+    def get_hill_score_dir(self):
+        return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'HillScore')
+
+    def get_lactate_threshold_dir(self):
+        return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'LactateThreshold')
+
+    def get_body_battery_dir(self):
+        return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'BodyBattery')
+
+    def get_body_composition_dir(self):
+        return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'BodyComposition')
+
+    def get_fitness_age_dir(self):
+        return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'FitnessAge')
+
+    def get_running_predictions_dir(self):
+        return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'RunningPredictions')
+
     def get_fitbit_dir(self):
         """Return the configured directory of where the FitBit will be stored."""
         return self.__create_dir_if_needed(self.get_base_dir() + os.sep + 'FitBitFiles')

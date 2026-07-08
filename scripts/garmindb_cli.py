@@ -24,14 +24,14 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from garmindb import python_version_check, log_version, format_version  # noqa: E402
-from garmindb.garmindb import GarminDb, Attributes, Sleep, Weight, RestingHeartRate, Hrv, TrainingReadiness  # noqa: E402
+from garmindb.garmindb import GarminDb, Attributes, Sleep, Weight, RestingHeartRate, Hrv, TrainingReadiness, ConnectMetricRaw  # noqa: E402
 from garmindb.garmindb import MonitoringDb, MonitoringHeartRate, ActivitiesDb, GarminSummaryDb  # noqa: E402
 from garmindb.summarydb import SummaryDb  # noqa: E402
 
 from garmindb import Download, Copy, Analyze  # noqa: E402
 from garmindb import FitFileProcessor, ActivityFitFileProcessor, MonitoringFitFileProcessor, SleepFitFileProcessor  # noqa: E402
 from garmindb import GarminUserSettings, GarminSocialProfile, GarminPersonalInformation, GarminWeightData, GarminSummaryData, GarminMonitoringFitData, GarminSleepFitData, \
-    GarminSleepData, GarminRhrData, GarminSettingsFitData, GarminHydrationData  # noqa: E402
+    GarminSleepData, GarminRhrData, GarminSettingsFitData, GarminHydrationData, GarminConnectMetricRawData  # noqa: E402
 from garmindb import GarminJsonSummaryData, GarminJsonDetailsData, GarminTcxData, GarminActivitiesFitData  # noqa: E402
 from garmindb import ActivityExporter  # noqa: E402
 
@@ -46,6 +46,22 @@ logger.addHandler(logging.StreamHandler(stream=sys.stdout))
 root_logger = logging.getLogger()
 
 
+RAW_CONNECT_STATS = {
+    Statistics.training_status: ('training_status', 'get_training_status_dir', 'get_training_status', r'training_status_\d{4}-\d{2}-\d{2}\.json'),
+    Statistics.endurance_score: ('endurance_score', 'get_endurance_score_dir', 'get_endurance_score', r'endurance_score_\d{4}-\d{2}-\d{2}\.json'),
+    Statistics.hill_score: ('hill_score', 'get_hill_score_dir', 'get_hill_score', r'hill_score_\d{4}-\d{2}-\d{2}\.json'),
+    Statistics.lactate_threshold: (
+        'lactate_threshold', 'get_lactate_threshold_dir', 'get_lactate_threshold',
+        r'lactate_threshold_\d{4}-\d{2}-\d{2}(?:_\d{4}-\d{2}-\d{2})?\.json'),
+    Statistics.body_battery: ('body_battery', 'get_body_battery_dir', 'get_body_battery', r'body_battery_\d{4}-\d{2}-\d{2}\.json'),
+    Statistics.body_composition: ('body_composition', 'get_body_composition_dir', 'get_body_composition', r'body_composition_\d{4}-\d{2}-\d{2}\.json'),
+    Statistics.fitness_age: ('fitness_age', 'get_fitness_age_dir', 'get_fitness_age', r'fitness_age_\d{4}-\d{2}-\d{2}\.json'),
+    Statistics.running_predictions: (
+        'running_predictions', 'get_running_predictions_dir', 'get_running_predictions',
+        r'running_predictions_\d{4}-\d{2}-\d{2}(?:_\d{4}-\d{2}-\d{2})?\.json'),
+}
+
+
 class GarminDbMain():
 
     stats_to_db_map = {
@@ -57,6 +73,14 @@ class GarminDbMain():
         Statistics.weight                : GarminDb,
         Statistics.hrv                   : GarminDb,
         Statistics.training_readiness    : GarminDb,
+        Statistics.training_status       : GarminDb,
+        Statistics.endurance_score       : GarminDb,
+        Statistics.hill_score            : GarminDb,
+        Statistics.lactate_threshold     : GarminDb,
+        Statistics.body_battery          : GarminDb,
+        Statistics.body_composition      : GarminDb,
+        Statistics.fitness_age           : GarminDb,
+        Statistics.running_predictions   : GarminDb,
         Statistics.activities            : ActivitiesDb
     }
 
@@ -86,6 +110,20 @@ class GarminDbMain():
             logger.error("Missing config: need %s_start_date and download_days. Edit GarminConnectConfig.py.", stat_name)
             sys.exit()
         return (date, days)
+
+    def __get_raw_metric_date_and_days(self, latest, metric):
+        garmin_db = GarminDb(self.gc_config.get_db_params())
+        if latest:
+            last = ConnectMetricRaw.latest_period_end(garmin_db, metric)
+            if last:
+                date = datetime.date.fromisoformat(last[:10]) - datetime.timedelta(days=1)
+                days = (datetime.date.today() - date).days
+            else:
+                date, days = self.gc_config.stat_start_date(metric)
+        else:
+            date, days = self.gc_config.stat_start_date(metric)
+            days = min((datetime.date.today() - date).days, days)
+        return date, days
 
     def copy_data(self, overwrite, latest, stats):
         """Copy data from a mounted Garmin USB device to files."""
@@ -180,6 +218,15 @@ class GarminDbMain():
                 download.get_training_readiness(tr_dir, date, days, overwrite)
                 root_logger.info("Saved training readiness files for %s (%d) to %s for processing", date, days, tr_dir)
 
+        for stat, (metric, dir_method, download_method, _regex) in RAW_CONNECT_STATS.items():
+            if stat in stats:
+                date, days = self.__get_raw_metric_date_and_days(latest, metric)
+                if days > 0:
+                    out_dir = getattr(self.gc_config, dir_method)()
+                    root_logger.info("Date range to update: %s (%d) to %s", date, days, out_dir)
+                    getattr(download, download_method)(out_dir, date, days, overwrite)
+                    root_logger.info("Saved %s files for %s (%d) to %s", metric, date, days, out_dir)
+
     def import_data(self, debug, latest, stats):
         """Import previously downloaded Garmin data into the database."""
         logger.info("___Importing %s Data___", 'Latest' if latest else 'All')
@@ -254,6 +301,13 @@ class GarminDbMain():
             gtrd = GarminTrainingReadinessData(self.gc_config.get_db_params(), tr_dir, latest, debug)
             if gtrd.file_count() > 0:
                 gtrd.process()
+
+        for stat, (metric, dir_method, _download_method, regex) in RAW_CONNECT_STATS.items():
+            if stat in stats:
+                raw_dir = getattr(self.gc_config, dir_method)()
+                raw = GarminConnectMetricRawData(self.gc_config.get_db_params(), raw_dir, metric, regex, latest, debug)
+                if raw.file_count() > 0:
+                    raw.process()
 
         if Statistics.activities in stats:
             activities_dir = self.gc_config.get_activities_dir()
@@ -344,6 +398,22 @@ def main(argv):
     stats_group.add_argument("--hrv", help="Download and/or import heart rate variability data.", dest='stats', action='append_const', const=Statistics.hrv)
     stats_group.add_argument("--training_readiness", help="Download and/or import training readiness data.",
                              dest='stats', action='append_const', const=Statistics.training_readiness)
+    stats_group.add_argument("--training_status", help="Download and/or import training status data.",
+                             dest='stats', action='append_const', const=Statistics.training_status)
+    stats_group.add_argument("--endurance_score", help="Download and/or import endurance score data.",
+                             dest='stats', action='append_const', const=Statistics.endurance_score)
+    stats_group.add_argument("--hill_score", help="Download and/or import hill score data.",
+                             dest='stats', action='append_const', const=Statistics.hill_score)
+    stats_group.add_argument("--lactate_threshold", help="Download and/or import lactate threshold data.",
+                             dest='stats', action='append_const', const=Statistics.lactate_threshold)
+    stats_group.add_argument("--body_battery", help="Download and/or import body battery detail data.",
+                             dest='stats', action='append_const', const=Statistics.body_battery)
+    stats_group.add_argument("--body_composition", help="Download and/or import body composition data.",
+                             dest='stats', action='append_const', const=Statistics.body_composition)
+    stats_group.add_argument("--fitness_age", help="Download and/or import fitness age data.",
+                             dest='stats', action='append_const', const=Statistics.fitness_age)
+    stats_group.add_argument("--running_predictions", help="Download and/or import race prediction and running tolerance data.",
+                             dest='stats', action='append_const', const=Statistics.running_predictions)
     stats_group.add_argument("-s", "--sleep", help="Download and/or import sleep data.", dest='stats', action='append_const', const=Statistics.sleep)
     stats_group.add_argument("-w", "--weight", help="Download and/or import weight data.", dest='stats', action='append_const', const=Statistics.weight)
     modifiers_group = parser.add_argument_group('Modifiers')

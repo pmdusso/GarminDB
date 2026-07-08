@@ -20,6 +20,14 @@ class Statistics(enum.Enum):
     activities = 7
     hrv = 8
     training_readiness = 9
+    training_status = 10
+    endurance_score = 11
+    hill_score = 12
+    lactate_threshold = 13
+    body_battery = 14
+    body_composition = 15
+    fitness_age = 16
+    running_predictions = 17
 
     @classmethod
     def from_string(cls, string):

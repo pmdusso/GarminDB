@@ -28,15 +28,15 @@ _Mapeia cada item do menu do Garmin Connect (ver [dados-originais-garmin-connect
 | --------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------- |
 | Sono                                          | ✅     | `garmin.sleep` (fases: deep/light/rem/awake, score, qualifier, spo2, rr, stress) + `sleep_events` (série de eventos) |
 | Status de saúde (Health Snapshot)             | ❌     | —                                                                                                                    |
-| Peso                                          | ✅     | `garmin.weight` (417 registros, 2020→2026-05)                                                                        |
+| Peso                                          | ✅     | `garmin.weight`; composição corporal oficial entra bruta em `connect_metric_raw` (`body_composition`) quando habilitada |
 | Pressão sanguínea                             | ❌     | Não há tabela de pressão                                                                                             |
 | Oximetria de pulso (SpO₂)                     | ✅     | `daily_summary.spo2_avg/spo2_min`; série minuto-a-minuto em `monitoring_pulse_ox` (556k linhas)                      |
 | Aclimatação com oximetria (altitude)          | ❌     | —                                                                                                                    |
 | Respiração (freq. respiratória)               | ✅     | `daily_summary.rr_waking_avg/rr_max/rr_min`; série em `monitoring_rr` (1.5M linhas); `sleep.avg_rr`                  |
 | Frequência cardíaca                           | ✅     | Série em `monitoring_hr` (1.4M linhas); `daily_summary.hr_min/hr_max/rhr`; RHR dedicado em `resting_hr`              |
-| Idade do condicionamento físico (Fitness Age) | ❌     | —                                                                                                                    |
+| Idade do condicionamento físico (Fitness Age) | 🟡     | Suporte de import bruto em `connect_metric_raw` (`fitness_age`); ainda sem tabela analítica normalizada             |
 | Estresse                                      | ✅     | `garmin.stress` (série, 1.95M linhas); `daily_summary.stress_avg`                                                    |
-| Body Battery                                  | 🟡     | Só agregado diário: `daily_summary.bb_charged/bb_max/bb_min`. **Não** temos a curva contínua do dia                  |
+| Body Battery                                  | 🟡     | Agregado diário em `daily_summary.bb_charged/bb_max/bb_min`; payload oficial detalhado passa por `connect_metric_raw` quando `body_battery` estiver habilitado |
 | Resumo de saúde                               | ✅     | `garmin_summary.days_summary` (linha por dia com HR, sono, estresse, peso, calorias, SpO₂, RR, BB…)                  |
 
 ## 4. Nutrição
@@ -50,18 +50,18 @@ _Mapeia cada item do menu do Garmin Connect (ver [dados-originais-garmin-connect
 
 | Garmin Connect                        | Status | Onde no banco                                                                                                                                                                    |
 | ------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Status de treinamento                 | ❌     | Não baixado como série de saúde                                                                                                                                                  |
+| Status de treinamento                 | 🟡     | Suporte de import bruto em `connect_metric_raw` (`training_status`); ainda sem tabela analítica normalizada                                                                      |
 | Disposição / autoavaliação            | 🟡     | Por atividade: `activities.self_eval_feel/self_eval_effort`. Não há série de "mood"                                                                                              |
 | Status de VFC (HRV)                   | ✅     | `garmin.hrv` (diário: weekly_avg, last_night, baseline, status); `monitoring_hrv_status` (1378) + `monitoring_hrv_value` (série, 110k)                                           |
-| Previsão de corrida (Race Predictor)  | ❌     | —                                                                                                                                                                                |
+| Previsão de corrida (Race Predictor)  | 🟡     | Suporte de import bruto em `connect_metric_raw` (`running_predictions`); ainda sem tabela analítica normalizada                                                                  |
 | VO₂ Máx                               | 🟡     | Só carimbado por atividade: `steps_activities.vo2_max` (corrida 47–58), `cycle_activities.vo2_max` (ciclismo 52–57). **Não** há série histórica de saúde dedicada                |
 | Efeito de treino                      | ✅     | `activities.training_effect` (aeróbico) + `anaerobic_training_effect` + `training_load`                                                                                          |
 | Curva de potência                     | 🟡     | Não há tabela de curva. Mas há `power` bruto em `activity_records` (série por ativ.) → dá pra **calcular** a curva                                                               |
-| FTP                                   | ❌     | —                                                                                                                                                                                |
+| FTP                                   | 🟡     | Potência por atividade/rollup existe; payload oficial de limiar/FTP de corrida entra bruto em `connect_metric_raw` (`lactate_threshold`)                                         |
 | Velocidade crítica de natação         | ❌     | —                                                                                                                                                                                |
-| Limiar de lactato                     | ❌     | —                                                                                                                                                                                |
-| Pontuação em resistência (Endurance)  | ❌     | —                                                                                                                                                                                |
-| Pontuação em subida (Hill Score)      | ❌     | —                                                                                                                                                                                |
+| Limiar de lactato                     | 🟡     | Suporte de import bruto em `connect_metric_raw` (`lactate_threshold`); ainda sem normalização clínica                                                                            |
+| Pontuação em resistência (Endurance)  | 🟡     | Suporte de import bruto em `connect_metric_raw` (`endurance_score`); ainda sem tabela analítica normalizada                                                                      |
+| Pontuação em subida (Hill Score)      | 🟡     | Suporte de import bruto em `connect_metric_raw` (`hill_score`); ainda sem tabela analítica normalizada                                                                           |
 | Estresse na variação da FC (HRV load) | ❌     | Temos HRV status, mas não a métrica "HRV load/stress"                                                                                                                            |
 | **Training Readiness**                | ✅     | `garmin.training_readiness` (score, level, feedback, fatores de recuperação/sono/HRV/carga). ⚠️ só 21 dias (2026-06-04→06-24) — feature nova do fork, não estava no doc original |
 
@@ -125,9 +125,13 @@ Os "Relatórios" do Garmin (Ciclismo, Corrida, Natação…) são **recortes por
 
 **Lacunas principais (Garmin calcula, não baixamos):**
 
-1. Métricas fisiológicas derivadas como série de saúde: **VO₂ Máx histórico, Fitness Age, Training Status, Race Predictor, Endurance/Hill Score, FTP, Limiar de lactato, Velocidade crítica de natação**.
-2. **Body Battery** só como agregado diário (sem a curva).
+1. Métricas fisiológicas derivadas agora têm **import bruto opcional** para Fitness Age, Training Status, Race Predictor/Running Tolerance, Endurance/Hill Score e Limiar de lactato; falta normalização analítica.
+2. **Body Battery** tem agregado diário e import bruto opcional da curva/eventos; falta normalização analítica.
 3. **Treino de força** sem séries/reps/exercícios/músculos (o "formato especial" do doc não é capturado).
-4. **Nutrição** só calorias totais (sem macros).
+4. **Nutrição** só calorias totais (sem macros); composição corporal pode ser capturada bruta se houver dados no Garmin.
 5. **Pressão sanguínea, Golfe, Planejamento/Workouts, Insights sociais, Medalhas/Objetivos** — nada.
 6. `activity_splits` vazia; NP/TSS/IF e curva de potência não pré-calculados (mas `power` bruto permite derivar).
+
+> `connect_metric_raw` é uma área privada de captura de payload oficial Garmin Connect.
+> Esses JSONs não devem alimentar o payload público do BloodB sem allowlist explícita
+> de campos e sem remover identificadores, textos ou metadados operacionais.

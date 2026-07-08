@@ -44,6 +44,16 @@ class Download():
     garmin_connect_daily_hydration_url = garmin_connect_usersummary_url + "/hydration/allData"
     garmin_connect_hrv_url = "/hrv-service/hrv"
     garmin_connect_training_readiness_url = "/metrics-service/metrics/trainingreadiness"
+    garmin_connect_training_status_url = "/metrics-service/metrics/trainingstatus/aggregated"
+    garmin_connect_endurance_score_url = "/metrics-service/metrics/endurancescore"
+    garmin_connect_hill_score_url = "/metrics-service/metrics/hillscore"
+    garmin_connect_body_battery_url = "/wellness-service/wellness/bodyBattery/reports/daily"
+    garmin_connect_body_battery_events_url = "/wellness-service/wellness/bodyBattery/events"
+    garmin_connect_biometric_url = "/biometric-service/biometric"
+    garmin_connect_biometric_stats_url = "/biometric-service/stats"
+    garmin_connect_fitnessage_url = "/fitnessage-service/fitnessage"
+    garmin_connect_race_predictor_url = "/metrics-service/metrics/racepredictions"
+    garmin_connect_running_tolerance_url = "/metrics-service/metrics/runningtolerance/stats"
 
     # https://connect.garmin.com/modern/proxy/usersummary-service/usersummary/hydration/allData/2019-11-29
 
@@ -318,3 +328,138 @@ class Download():
         """Download the training readiness data from Garmin Connect and save to a JSON file."""
         root_logger.info("Getting training readiness: %s (%d)", date, days)
         self.__get_stat(self.__get_training_readiness_day, directory, date, days, overwrite)
+
+    def __get_daily_raw_metric(self, directory, day, name, url, overwrite=False, params=None):
+        date_str = day.strftime('%Y-%m-%d')
+        json_filename = f'{directory}/{name}_{date_str}'
+        try:
+            self.save_json_to_file(json_filename, self.garmin.connectapi(url, params=params) if params else self.garmin.connectapi(url), overwrite)
+        except GarminConnectAuthError as e:
+            root_logger.error("Exception getting %s %s", name, e)
+
+    def get_training_status(self, directory, date, days, overwrite):
+        root_logger.info("Getting training status: %s (%d)", date, days)
+
+        def one_day(outdir, day, force):
+            date_str = day.strftime('%Y-%m-%d')
+            self.__get_daily_raw_metric(outdir, day, 'training_status',
+                                        f'{self.garmin_connect_training_status_url}/{date_str}', force)
+        self.__get_stat(one_day, directory, date, days, overwrite)
+
+    def get_endurance_score(self, directory, date, days, overwrite):
+        root_logger.info("Getting endurance score: %s (%d)", date, days)
+
+        def one_day(outdir, day, force):
+            date_str = day.strftime('%Y-%m-%d')
+            self.__get_daily_raw_metric(outdir, day, 'endurance_score',
+                                        self.garmin_connect_endurance_score_url, force,
+                                        {'calendarDate': date_str})
+        self.__get_stat(one_day, directory, date, days, overwrite)
+
+    def get_hill_score(self, directory, date, days, overwrite):
+        root_logger.info("Getting hill score: %s (%d)", date, days)
+
+        def one_day(outdir, day, force):
+            date_str = day.strftime('%Y-%m-%d')
+            self.__get_daily_raw_metric(outdir, day, 'hill_score',
+                                        self.garmin_connect_hill_score_url, force,
+                                        {'calendarDate': date_str})
+        self.__get_stat(one_day, directory, date, days, overwrite)
+
+    def get_fitness_age(self, directory, date, days, overwrite):
+        root_logger.info("Getting fitness age: %s (%d)", date, days)
+
+        def one_day(outdir, day, force):
+            date_str = day.strftime('%Y-%m-%d')
+            self.__get_daily_raw_metric(outdir, day, 'fitness_age',
+                                        f'{self.garmin_connect_fitnessage_url}/{date_str}', force)
+        self.__get_stat(one_day, directory, date, days, overwrite)
+
+    def __get_body_battery_day(self, directory, day, overwrite=False):
+        date_str = day.strftime('%Y-%m-%d')
+        json_filename = f'{directory}/body_battery_{date_str}'
+        try:
+            payload = {
+                'daily': self.garmin.connectapi(
+                    self.garmin_connect_body_battery_url,
+                    params={'startDate': date_str, 'endDate': date_str}),
+                'events': self.garmin.connectapi(f'{self.garmin_connect_body_battery_events_url}/{date_str}'),
+            }
+            self.save_json_to_file(json_filename, payload, overwrite)
+        except GarminConnectAuthError as e:
+            root_logger.error("Exception getting body battery %s", e)
+
+    def get_body_battery(self, directory, date, days, overwrite):
+        root_logger.info("Getting body battery: %s (%d)", date, days)
+        self.__get_stat(self.__get_body_battery_day, directory, date, days, overwrite)
+
+    def get_lactate_threshold(self, directory, date, days, overwrite):
+        root_logger.info("Getting lactate threshold: %s (%d)", date, days)
+        if days <= 0:
+            return
+        end = date + datetime.timedelta(days=days - 1)
+        start_str = date.strftime('%Y-%m-%d')
+        end_str = end.strftime('%Y-%m-%d')
+        suffix = start_str if start_str == end_str else f'{start_str}_{end_str}'
+        json_filename = f'{directory}/lactate_threshold_{suffix}'
+        try:
+            payload = {
+                'latest_speed_heart_rate': self.garmin.connectapi(
+                    f'{self.garmin_connect_biometric_url}/latestLactateThreshold'),
+                'latest_power': self.garmin.connectapi(
+                    f'{self.garmin_connect_biometric_url}/powerToWeight/latest/{end_str}',
+                    params={'sport': 'Running'}),
+                'range_speed': self.garmin.connectapi(
+                    f'{self.garmin_connect_biometric_stats_url}/lactateThresholdSpeed/range/{start_str}/{end_str}',
+                    params={'sport': 'RUNNING', 'aggregation': 'daily', 'aggregationStrategy': 'LATEST'}),
+                'range_heart_rate': self.garmin.connectapi(
+                    f'{self.garmin_connect_biometric_stats_url}/lactateThresholdHeartRate/range/{start_str}/{end_str}',
+                    params={'sport': 'RUNNING', 'aggregation': 'daily', 'aggregationStrategy': 'LATEST'}),
+                'range_power': self.garmin.connectapi(
+                    f'{self.garmin_connect_biometric_stats_url}/functionalThresholdPower/range/{start_str}/{end_str}',
+                    params={'sport': 'RUNNING', 'aggregation': 'daily', 'aggregationStrategy': 'LATEST'}),
+            }
+            self.save_json_to_file(json_filename, payload, overwrite)
+        except GarminConnectAuthError as e:
+            root_logger.error("Exception getting lactate threshold %s", e)
+
+    def __get_body_composition_day(self, directory, day, overwrite=False):
+        date_str = day.strftime('%Y-%m-%d')
+        self.__get_daily_raw_metric(
+            directory, day, 'body_composition', self.garmin_connect_weight_url, overwrite,
+            {'startDate': date_str, 'endDate': date_str})
+
+    def get_body_composition(self, directory, date, days, overwrite):
+        root_logger.info("Getting body composition: %s (%d)", date, days)
+        self.__get_stat(self.__get_body_composition_day, directory, date, days, overwrite)
+
+    def get_running_predictions(self, directory, date, days, overwrite):
+        root_logger.info("Getting running predictions: %s (%d)", date, days)
+        if days <= 0:
+            return
+        start = date
+        final = date + datetime.timedelta(days=days - 1)
+        while start <= final:
+            end = min(start + datetime.timedelta(days=364), final)
+            start_str = start.strftime('%Y-%m-%d')
+            end_str = end.strftime('%Y-%m-%d')
+            json_filename = f'{directory}/running_predictions_{start_str}_{end_str}'
+            try:
+                payload = {
+                    'latest': self.garmin.connectapi(
+                        f'{self.garmin_connect_race_predictor_url}/latest/{self.display_name}'),
+                    'daily': self.garmin.connectapi(
+                        f'{self.garmin_connect_race_predictor_url}/daily/{self.display_name}',
+                        params={'fromCalendarDate': start_str, 'toCalendarDate': end_str}),
+                    'monthly': self.garmin.connectapi(
+                        f'{self.garmin_connect_race_predictor_url}/monthly/{self.display_name}',
+                        params={'fromCalendarDate': start_str, 'toCalendarDate': end_str}),
+                    'running_tolerance': self.garmin.connectapi(
+                        self.garmin_connect_running_tolerance_url,
+                        params={'startDate': start_str, 'endDate': end_str, 'aggregation': 'daily'}),
+                }
+                force = overwrite or (datetime.datetime.now().date() - end).days <= self.download_days_overlap
+                self.save_json_to_file(json_filename, payload, force)
+            except GarminConnectAuthError as e:
+                root_logger.error("Exception getting running predictions %s", e)
+            start = end + datetime.timedelta(days=1)

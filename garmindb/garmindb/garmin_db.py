@@ -8,7 +8,7 @@ import os
 import datetime
 import logging
 import re
-from sqlalchemy import Column, Integer, DateTime, Time, Float, String, Enum, ForeignKey, func, PrimaryKeyConstraint
+from sqlalchemy import Column, Integer, DateTime, Time, Float, String, Text, Enum, ForeignKey, func, PrimaryKeyConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
 
 import fitfile
@@ -399,6 +399,46 @@ class TrainingReadiness(GarminDb.Base, idbutils.DbObject):
             'readiness_min': cls.s_get_col_min(session, cls.score, start_ts, end_ts, ignore_le_zero=True),
             'readiness_max': cls.s_get_col_max(session, cls.score, start_ts, end_ts),
         }
+
+
+class ConnectMetricRaw(GarminDb.Base, idbutils.DbObject):
+    """Raw Garmin Connect metric payloads not yet normalized into analytic tables."""
+
+    __tablename__ = 'connect_metric_raw'
+
+    db = GarminDb
+    table_version = 1
+
+    metric = Column(String, nullable=False)
+    period_start = Column(String, nullable=False)
+    period_end = Column(String, nullable=False)
+    granularity = Column(String, nullable=False)
+    payload_json = Column(Text, nullable=False)
+    imported_at = Column(DateTime, nullable=False)
+
+    __table_args__ = (
+        PrimaryKeyConstraint('metric', 'period_start', 'period_end', 'granularity'),
+    )
+
+    @classmethod
+    def s_get_from_dict(cls, session, values_dict):
+        return session.get(cls, (
+            values_dict['metric'],
+            values_dict['period_start'],
+            values_dict['period_end'],
+            values_dict['granularity'],
+        ))
+
+    @classmethod
+    def latest_period_end(cls, db, metric):
+        with db.managed_session() as session:
+            return (
+                session.query(cls.period_end)
+                .filter(cls.metric == metric)
+                .order_by(cls.period_end.desc())
+                .limit(1)
+                .scalar()
+            )
 
 
 class DailySummary(GarminDb.Base, idbutils.DbObject):
