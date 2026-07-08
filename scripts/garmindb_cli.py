@@ -19,20 +19,25 @@ import tempfile
 import zipfile
 import glob
 
-from garmindb import python_version_check, log_version, format_version
-from garmindb.garmindb import GarminDb, Attributes, Sleep, Weight, RestingHeartRate, Hrv, TrainingReadiness, MonitoringDb, MonitoringHeartRate, ActivitiesDb, GarminSummaryDb
-from garmindb.summarydb import SummaryDb
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
 
-from garmindb import Download, Copy, Analyze
-from garmindb import FitFileProcessor, ActivityFitFileProcessor, MonitoringFitFileProcessor, SleepFitFileProcessor
+from garmindb import python_version_check, log_version, format_version  # noqa: E402
+from garmindb.garmindb import GarminDb, Attributes, Sleep, Weight, RestingHeartRate, Hrv, TrainingReadiness  # noqa: E402
+from garmindb.garmindb import MonitoringDb, MonitoringHeartRate, ActivitiesDb, GarminSummaryDb  # noqa: E402
+from garmindb.summarydb import SummaryDb  # noqa: E402
+
+from garmindb import Download, Copy, Analyze  # noqa: E402
+from garmindb import FitFileProcessor, ActivityFitFileProcessor, MonitoringFitFileProcessor, SleepFitFileProcessor  # noqa: E402
 from garmindb import GarminUserSettings, GarminSocialProfile, GarminPersonalInformation, GarminWeightData, GarminSummaryData, GarminMonitoringFitData, GarminSleepFitData, \
-    GarminSleepData, GarminRhrData, GarminSettingsFitData, GarminHydrationData
-from garmindb import GarminJsonSummaryData, GarminJsonDetailsData, GarminTcxData, GarminActivitiesFitData
-from garmindb import ActivityExporter
+    GarminSleepData, GarminRhrData, GarminSettingsFitData, GarminHydrationData  # noqa: E402
+from garmindb import GarminJsonSummaryData, GarminJsonDetailsData, GarminTcxData, GarminActivitiesFitData  # noqa: E402
+from garmindb import ActivityExporter  # noqa: E402
 
-from garmindb import GarminConnectConfigManager, PluginManager
-from garmindb import Statistics
-from garmindb import OpenWithBaseCamp, OpenWithGoogleEarth
+from garmindb import GarminConnectConfigManager, PluginManager  # noqa: E402
+from garmindb import Statistics  # noqa: E402
+from garmindb import OpenWithBaseCamp, OpenWithGoogleEarth  # noqa: E402
 
 
 logging.basicConfig(filename='garmindb.log', filemode='w', level=logging.INFO)

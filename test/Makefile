@@ -8,6 +8,9 @@ export VENV=$(PROJECT_BASE)/.venv
 include $(PROJECT_BASE)/defines.mk
 include analysis_groups.mk
 
+PYTHON_PATH ?= $(VENV)/bin/$(PYTHON)
+export PYTHONPATH ?= $(PROJECT_BASE)
+
 
 DB_TEST_GROUPS=garmin_db activities_db monitoring_db garmin_summary_db summary_db
 DB_OBJECTS_TEST_GROUPS=garmin_db_objects

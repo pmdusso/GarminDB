@@ -8,8 +8,13 @@ Usage:
 """
 
 import argparse
+import sys
 from datetime import date, datetime
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def parse_date(date_str: str) -> date:
@@ -60,6 +65,16 @@ def main():
              "totals, red-flag screen) for a sports-medicine review",
     )
     parser.add_argument(
+        "--treinos-dashboard",
+        action="store_true",
+        help="Generate the BloodB Treinos dashboard DTO as JSON",
+    )
+    parser.add_argument(
+        "--treinos-config",
+        type=Path,
+        help="Optional BloodB treinos-config.json path for dashboard targets",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Output as JSON instead of markdown",
@@ -73,7 +88,21 @@ def main():
     gc_config = GarminConnectConfigManager()
     db_params = gc_config.get_db_params()
 
-    if args.anamnesis:
+    if args.treinos_dashboard:
+        import json
+        from garmindb.analysis.treinos_dashboard import build_dashboard
+
+        output = json.dumps(
+            build_dashboard(
+                db_dir=db_params.db_path,
+                config_path=args.treinos_config,
+                period_start=args.start,
+                period_end=args.end,
+            ),
+            ensure_ascii=False,
+            indent=2,
+        )
+    elif args.anamnesis:
         from datetime import datetime as _dt
         from garmindb.analysis.performance_targets import load_performance_targets
         from garmindb.analysis.longitudinal_report import LongitudinalReportBuilder
