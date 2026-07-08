@@ -40,6 +40,11 @@ def _mk_dbs(root: Path):
             day TEXT, timestamp TEXT, score REAL, level TEXT,
             feedback_short TEXT, recovery_time REAL
         );
+        CREATE TABLE connect_metric_raw (
+            metric TEXT, period_start TEXT, period_end TEXT, granularity TEXT,
+            payload_json TEXT, imported_at TEXT,
+            PRIMARY KEY (metric, period_start, period_end, granularity)
+        );
     """)
     for i in range(10):
         day = (TODAY - dt.timedelta(days=i)).isoformat()
@@ -63,6 +68,48 @@ def _mk_dbs(root: Path):
     garmin.execute(
         "INSERT INTO training_readiness VALUES (?,?,?,?,?,?)",
         (END, f"{END} 07:00:00", 78, "HIGH", "READY", 12),
+    )
+    training_status = {
+        "mostRecentTrainingStatus": {
+            "latestTrainingStatusData": {
+                "device-123": {
+                    "calendarDate": END,
+                    "trainingStatus": 4,
+                    "trainingStatusFeedbackPhrase": "MAINTAINING_2",
+                    "acuteTrainingLoadDTO": {
+                        "dailyTrainingLoadAcute": 1068,
+                        "dailyTrainingLoadChronic": 841,
+                        "dailyAcuteChronicWorkloadRatio": 1.2,
+                    },
+                },
+            },
+        },
+        "mostRecentTrainingLoadBalance": {
+            "metricsTrainingLoadBalanceDTOMap": {
+                "device-123": {
+                    "calendarDate": END,
+                    "trainingBalanceFeedbackPhrase": "AEROBIC_LOW_SHORTAGE",
+                    "monthlyLoadAerobicLow": 491.1952,
+                    "monthlyLoadAerobicLowTargetMin": 526,
+                    "monthlyLoadAerobicLowTargetMax": 1179,
+                    "monthlyLoadAerobicHigh": 2031.7542,
+                    "monthlyLoadAerobicHighTargetMin": 670,
+                    "monthlyLoadAerobicHighTargetMax": 1323,
+                    "monthlyLoadAnaerobic": 755.1016,
+                    "monthlyLoadAnaerobicTargetMin": 217,
+                    "monthlyLoadAnaerobicTargetMax": 652,
+                },
+            },
+        },
+    }
+    endurance_score = {"calendarDate": END, "overallScore": 7422, "classification": 5}
+    garmin.execute(
+        "INSERT INTO connect_metric_raw VALUES (?,?,?,?,?,?)",
+        ("training_status", END, END, "daily", json.dumps(training_status), f"{END} 08:00:00"),
+    )
+    garmin.execute(
+        "INSERT INTO connect_metric_raw VALUES (?,?,?,?,?,?)",
+        ("endurance_score", END, END, "daily", json.dumps(endurance_score), f"{END} 08:00:00"),
     )
     garmin.commit()
     garmin.close()
@@ -128,6 +175,20 @@ def test_build_dashboard_returns_treinos_v2_contract(tmp_path):
     assert dashboard["carga-performance"]["zones"]
     assert dashboard["carga-performance"]["scorecard"]
     assert dashboard["recuperacao-sono"]["main_chart"]["target"] == 7.5
+
+
+def test_carga_performance_uses_official_connect_metrics(tmp_path):
+    _mk_dbs(tmp_path)
+
+    carga = build_dashboard(db_dir=str(tmp_path), period_end=END)["carga-performance"]
+
+    assert any(h["label"] == "Status Garmin" and h["value"] == "Mantendo" for h in carga["hero"])
+    assert {"label": "Endurance Score", "current": 7422, "target": None, "unit": ""} in carga["scorecard"]
+    assert {"label": "Aeróbico baixo", "current": 491, "target": 526, "unit": ""} in carga["scorecard"]
+    assert any(i["title"] == "Foco de carga Garmin" and "aeróbica baixa" in i["body"] for i in carga["insights"])
+
+    dump = json.dumps(carga, ensure_ascii=False)
+    assert "device-123" not in dump
 
 
 def test_build_dashboard_payload_excludes_activity_pii(tmp_path):

@@ -11,6 +11,8 @@ import sqlite3
 import statistics
 from pathlib import Path
 
+from .treinos_rollups import daily_hrv_series, daily_training_load_rows, power_summary_rows
+
 
 GROUPS = ("cardiovascular", "metabolismo", "carga-performance", "recuperacao-sono")
 SERIES_DAYS = 180
@@ -103,6 +105,39 @@ def _first(rows, col):
     return rows[0][col] if rows else None
 
 
+def _latest_raw_metric(db_dir, metric, end):
+    rows = _query(db_dir, "garmin.db",
+                  "SELECT payload_json FROM connect_metric_raw "
+                  "WHERE metric = ? AND period_end <= ? ORDER BY period_end DESC LIMIT 1",
+                  (metric, end.isoformat()))
+    if not rows:
+        return {}
+    try:
+        payload = json.loads(rows[0]["payload_json"])
+    except (TypeError, ValueError):
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _first_dict_value(value):
+    if not isinstance(value, dict):
+        return {}
+    for item in value.values():
+        if isinstance(item, dict):
+            return item
+    return {}
+
+
+def _number(value, ndigits=0):
+    if value is None:
+        return None
+    try:
+        out = round(float(value), ndigits)
+    except (TypeError, ValueError):
+        return None
+    return int(out) if ndigits == 0 else out
+
+
 def _time_to_hours(value):
     if not value or not isinstance(value, str):
         return None
@@ -167,6 +202,70 @@ def _age(cfg, end):
 
 def _insight(severity, title, body):
     return {"severity": severity, "title": title, "body": body}
+
+
+def _official_training_metrics(db_dir, end):
+    payload = _latest_raw_metric(db_dir, "training_status", end)
+    status = _first_dict_value(
+        (payload.get("mostRecentTrainingStatus") or {}).get("latestTrainingStatusData")
+    )
+    load = _first_dict_value(
+        (payload.get("mostRecentTrainingLoadBalance") or {}).get("metricsTrainingLoadBalanceDTOMap")
+    )
+    return status, load
+
+
+def _official_endurance_score(db_dir, end):
+    return _latest_raw_metric(db_dir, "endurance_score", end).get("overallScore")
+
+
+def _training_status_pt(phrase):
+    key = str(phrase or "").split("_", 1)[0].upper()
+    labels = {
+        "PRODUCTIVE": "Produtivo",
+        "MAINTAINING": "Mantendo",
+        "RECOVERY": "Recuperação",
+        "PEAKING": "Pico",
+        "UNPRODUCTIVE": "Improdutivo",
+        "STRAINED": "Sob estresse",
+        "OVERREACHING": "Sobrecarga",
+        "DETRAINING": "Destreinando",
+    }
+    return labels.get(key)
+
+
+def _training_status_level(phrase):
+    key = str(phrase or "").split("_", 1)[0].upper()
+    if key in {"PRODUCTIVE", "MAINTAINING", "RECOVERY", "PEAKING"}:
+        return "good"
+    if key in {"UNPRODUCTIVE", "STRAINED", "OVERREACHING", "DETRAINING"}:
+        return "warning"
+    return "neutral"
+
+
+def _load_focus_pt(phrase):
+    labels = {
+        "AEROBIC_LOW_SHORTAGE": "Déficit de aeróbica baixa",
+        "AEROBIC_HIGH_SHORTAGE": "Déficit de aeróbica alta",
+        "ANAEROBIC_SHORTAGE": "Déficit de anaeróbico",
+        "BALANCED": "Foco de carga equilibrado",
+    }
+    return labels.get(str(phrase or "").upper())
+
+
+def _append_load_focus_scorecard(scorecard, load):
+    rows = (
+        ("Aeróbico baixo", "monthlyLoadAerobicLow", "monthlyLoadAerobicLowTargetMin", "monthlyLoadAerobicLowTargetMax"),
+        ("Aeróbico alto", "monthlyLoadAerobicHigh", "monthlyLoadAerobicHighTargetMin", "monthlyLoadAerobicHighTargetMax"),
+        ("Anaeróbico", "monthlyLoadAnaerobic", "monthlyLoadAnaerobicTargetMin", "monthlyLoadAnaerobicTargetMax"),
+    )
+    for label, value_key, min_key, max_key in rows:
+        current = _number(load.get(value_key))
+        low, high = _number(load.get(min_key)), _number(load.get(max_key))
+        if current is None:
+            continue
+        target = low if low is not None and current < low else high if high is not None and current > high else None
+        scorecard.append({"label": label, "current": current, "target": target, "unit": ""})
 
 
 def _build_cardiovascular(db_dir, cfg, start, end):
@@ -267,10 +366,10 @@ def _build_metabolismo(db_dir, cfg, start, end):
 
 
 def _dense_daily_load(db_dir, start, end):
-    rows = _query(db_dir, "garmin_activities.db",
-                  "SELECT substr(start_time, 1, 10) AS day, SUM(training_load) AS load FROM activities WHERE substr(start_time, 1, 10) BETWEEN ? AND ? GROUP BY day",
-                  (start.isoformat(), end.isoformat()))
-    by_day = {r["day"]: (r["load"] or 0.0) for r in rows}
+    rows = daily_training_load_rows(db_dir, start, end)
+    by_day = {}
+    for row in rows:
+        by_day[row["day"]] = by_day.get(row["day"], 0.0) + float(row["load"] or 0.0)
     out, day = [], start
     while day <= end:
         out.append(float(by_day.get(day.isoformat(), 0.0)))
@@ -319,22 +418,52 @@ def _build_carga_performance(db_dir, cfg, start, end):
         scorecard.append({"label": "W/kg", "current": wkg, "target": cfg["wkg_target"], "unit": ""})
     if _first(vo2, "vo2_max"):
         scorecard.append({"label": "VO2max bike", "current": _first(vo2, "vo2_max"), "target": None, "unit": ""})
+    power_rows = power_summary_rows(db_dir, start, end)
+    best_20 = [r["best_1200s"] for r in power_rows if r.get("best_1200s")]
+    if best_20:
+        scorecard.append({"label": "eFTP medido", "current": round(max(best_20) * 0.95), "target": cfg.get("ftp_target"), "unit": "W"})
+    official_status, official_load = _official_training_metrics(db_dir, end)
+    endurance_score = _number(_official_endurance_score(db_dir, end))
+    status_label = _training_status_pt(official_status.get("trainingStatusFeedbackPhrase"))
+    if endurance_score is not None:
+        scorecard.append({"label": "Endurance Score", "current": endurance_score, "target": None, "unit": ""})
+    _append_load_focus_scorecard(scorecard, official_load)
     zones = [{"zone": z, "label": f"Z{z}", "min_w": round(ftp * lo), "max_w": round(ftp * hi) if hi else None} for z, lo, hi in FTP_ZONES] if ftp else []
+    charts = [_chart("bars", "Volume semanal", xh,
+                     [{"label": "Horas", "values": [round(v, 1) for v in hours], "style": "bars"},
+                      {"label": "km", "values": [round(v, 1) for v in km], "axis": 2}])]
+    if power_rows:
+        charts.append(_chart("lines", "Melhor potência por atividade", [r["day"] for r in power_rows],
+                             [{"label": "5s", "values": [r["best_5s"] for r in power_rows]},
+                              {"label": "1min", "values": [r["best_60s"] for r in power_rows]},
+                              {"label": "5min", "values": [r["best_300s"] for r in power_rows]},
+                              {"label": "20min", "values": [r["best_1200s"] for r in power_rows]}],
+                             default_window=90))
+    insights = []
+    load_label = _load_focus_pt(official_load.get("trainingBalanceFeedbackPhrase"))
+    if load_label:
+        low = _number(official_load.get("monthlyLoadAerobicLow"))
+        target_min = _number(official_load.get("monthlyLoadAerobicLowTargetMin"))
+        target_max = _number(official_load.get("monthlyLoadAerobicLowTargetMax"))
+        context = f": Garmin reporta {low} vs alvo {target_min}-{target_max}." if low and target_min and target_max else "."
+        insights.append(_insight("warning", "Foco de carga Garmin", load_label + context))
+    hero = [
+        _hero("Forma", form, "", status, "crônica − aguda · positivo = fresco", "fitness-balance"),
+        _hero("ACWR (7d/28d)", acwr, "", "neutral", "faixa informativa 0,8–1,3"),
+        _hero("Última atividade", f"{_sport_pt(last['sport'])} {round(last['distance'] or 0, 1)}km", "", "neutral",
+              f"TE {last['training_effect']} / {last['anaerobic_training_effect']}" if last["training_effect"] is not None else ""),
+    ]
+    if status_label:
+        hero.insert(0, _hero("Status Garmin", status_label, "", _training_status_level(
+            official_status.get("trainingStatusFeedbackPhrase")), "oficial Garmin Connect", "training-status"))
     return {
         "period_start": start.isoformat(), "period_end": end.isoformat(),
-        "hero": [
-            _hero("Forma", form, "", status, "crônica − aguda · positivo = fresco", "fitness-balance"),
-            _hero("ACWR (7d/28d)", acwr, "", "neutral", "faixa informativa 0,8–1,3"),
-            _hero("Última atividade", f"{_sport_pt(last['sport'])} {round(last['distance'] or 0, 1)}km", "", "neutral",
-                  f"TE {last['training_effect']} / {last['anaerobic_training_effect']}" if last["training_effect"] is not None else ""),
-        ],
+        "hero": hero,
         "main_chart": _chart("lines", "Carga aguda × crônica (EPOC)", x,
                              [{"label": "Carga aguda (EPOC 7d)", "values": [round(v, 1) for v in acute]},
                               {"label": "Carga crônica (EPOC 42d)", "values": [round(v, 1) for v in chronic]}]),
-        "charts": [_chart("bars", "Volume semanal", xh,
-                          [{"label": "Horas", "values": [round(v, 1) for v in hours], "style": "bars"},
-                           {"label": "km", "values": [round(v, 1) for v in km], "axis": 2}])],
-        "insights": [], "zones": zones, "scorecard": scorecard,
+        "charts": charts,
+        "insights": insights, "zones": zones, "scorecard": scorecard,
     }
 
 
@@ -344,9 +473,7 @@ def _build_recuperacao_sono(db_dir, cfg, start, end):
                    (start.isoformat(), end.isoformat()))
     if not sleep:
         return _empty(start, end)
-    hrv = _query(db_dir, "garmin.db",
-                 "SELECT day, weekly_avg, last_night_avg, status, baseline_low, baseline_upper FROM hrv WHERE day BETWEEN ? AND ? ORDER BY day",
-                 (start.isoformat(), end.isoformat()))
+    hrv = daily_hrv_series(db_dir, start, end)
     stress = _query(db_dir, "garmin.db",
                     "SELECT day, stress_avg, bb_charged, bb_max, bb_min FROM daily_summary WHERE day BETWEEN ? AND ? AND stress_avg IS NOT NULL ORDER BY day",
                     (start.isoformat(), end.isoformat()))

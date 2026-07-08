@@ -150,10 +150,10 @@ class LongitudinalPresenter:
                 weeks += f" ({r.days_to_race} dias)"
         return (
             f"# 🩺 Anamnese esportiva — visão longitudinal {r.period_start} a {r.period_end}\n\n"
-            f"**{who}**" + (f" · {demo}" if demo else "") + "  \n"
+            f"**{who}**" + (f" · {demo}" if demo else "") + "\n"
             f"Prova-alvo: **{race}**"
             + (f" ({r.targets.race_date})" if r.targets.race_date else "")
-            + weeks + "  \n"
+            + weeks + "\n"
             f"Gerado em {r.generated_at:%d/%m/%Y} a partir do Garmin Connect.\n\n"
             f"**Veredito geral:** {r.readiness_light} {r.readiness_label}\n"
         )

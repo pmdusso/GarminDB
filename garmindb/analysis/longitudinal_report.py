@@ -29,6 +29,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple
 
 from .activity_analyzer import LOAD_FACTORS
 from .performance_targets import PerformanceTargets
+from .treinos_rollups import daily_hrv_series
 
 if TYPE_CHECKING:  # type-only; never imported at runtime (no real cycle)
     from .decoupling_analyzer import DecouplingResult, PaHrResult
@@ -737,18 +738,11 @@ class LongitudinalReportBuilder:
         # (~33-40 ms here vs ~50-76 ms nightly) and would print a band that does
         # not contain its own mean, so we derive the personal baseline from the
         # series itself (mean ± 1 SD over the chronic window), like the others.
-        rows = self._query(
-            "garmin_monitoring.db",
-            "SELECT timestamp, last_night_average FROM monitoring_hrv_status "
-            "WHERE date(timestamp) >= ? AND date(timestamp) <= ? "
-            "AND last_night_average IS NOT NULL",
-            (self._start.isoformat(), self._end.isoformat()),
-        )
         daily = {}
-        for ts, avg in rows:
-            day = _parse_date(ts)
-            if day is not None and avg is not None:
-                daily[day] = float(avg)
+        for row in daily_hrv_series(self._db_dir, self._start, self._end):
+            day = _parse_date(row["day"])
+            if day is not None and row["last_night_avg"] is not None:
+                daily[day] = float(row["last_night_avg"])
         s = MetricSeries(key="hrv", label="VFC noturna (HRV)", unit="ms",
                          better="up", decimals=0)
         s.points = self._monthly_mean_points(daily, 0)

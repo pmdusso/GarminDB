@@ -16,3 +16,6 @@ def test_generate_report_help_lists_treinos_dashboard_flag():
     assert out.returncode == 0, out.stderr
     assert "--treinos-dashboard" in out.stdout
     assert "--treinos-config" in out.stdout
+    assert "--training-load-rollup" in out.stdout
+    assert "--power-rollup" in out.stdout
+    assert "--treinos-report" in out.stdout

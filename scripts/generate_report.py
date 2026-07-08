@@ -70,6 +70,21 @@ def main():
         help="Generate the BloodB Treinos dashboard DTO as JSON",
     )
     parser.add_argument(
+        "--training-load-rollup",
+        action="store_true",
+        help="Materialize daily_training_load in garmin_activities.db",
+    )
+    parser.add_argument(
+        "--power-rollup",
+        action="store_true",
+        help="Materialize activity_power_summary in garmin_activities.db",
+    )
+    parser.add_argument(
+        "--treinos-report",
+        choices=["carga-recuperacao"],
+        help="Generate a Treinos Markdown/JSON report",
+    )
+    parser.add_argument(
         "--treinos-config",
         type=Path,
         help="Optional BloodB treinos-config.json path for dashboard targets",
@@ -88,7 +103,27 @@ def main():
     gc_config = GarminConnectConfigManager()
     db_params = gc_config.get_db_params()
 
-    if args.treinos_dashboard:
+    if args.training_load_rollup:
+        import json
+        from garmindb.analysis.treinos_rollups import materialize_training_load
+
+        output = json.dumps(materialize_training_load(db_params.db_path), ensure_ascii=False, indent=2)
+    elif args.power_rollup:
+        import json
+        from garmindb.analysis.treinos_rollups import materialize_power_summary
+
+        output = json.dumps(materialize_power_summary(db_params.db_path), ensure_ascii=False, indent=2)
+    elif args.treinos_report == "carga-recuperacao":
+        import json
+        from garmindb.analysis.treinos_report import build_carga_recuperacao_report, render_carga_recuperacao_markdown
+
+        report = build_carga_recuperacao_report(
+            db_params.db_path,
+            period_start=args.start,
+            period_end=args.end,
+        )
+        output = json.dumps(report, ensure_ascii=False, indent=2) if args.json else render_carga_recuperacao_markdown(report)
+    elif args.treinos_dashboard:
         import json
         from garmindb.analysis.treinos_dashboard import build_dashboard
 

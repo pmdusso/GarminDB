@@ -67,11 +67,13 @@ série intradiária  →  por-evento/atividade  →  diário  →  semanal  → 
 | Estresse             | série (~3 min)       | `garmin.stress`                           | `timestamp` / `timestamp` | `stress`                                                                                             | 1.95M  | `*_summary.stress_avg`         |
 | Estresse (média dia) | diário               | `garmin.daily_summary`                    | `day` / `day`             | `stress_avg`                                                                                         | 2.4k   | `*_summary.stress_avg`         |
 | Body Battery         | diário (só agregado) | `garmin.daily_summary`                    | `day` / `day`             | `bb_charged`, `bb_max`, `bb_min`                                                                     | 2.4k   | `*_summary.bb_charged/max/min` |
-| HRV (status diário)  | diário               | `garmin.hrv`                              | `day` / `day`             | `weekly_avg`, `last_night_avg`, `last_night_5min_high`, `baseline_low`, `baseline_upper`, `status`   | 858    | —                              |
-| HRV (status, série)  | série                | `garmin_monitoring.monitoring_hrv_status` | `timestamp` / `timestamp` | `weekly_average`, `last_night`, `last_night_average`, `baseline_low/high`, `status`, `reading_count` | 1.4k   | —                              |
+| HRV Status (Garmin) | diário               | `garmin.hrv`                              | `day` / `day`             | `weekly_avg`, `last_night_avg`, `last_night_5min_high`, `baseline_low`, `baseline_upper`, `status`   | 858    | —                              |
+| HRV noturna (relógio) | série                | `garmin_monitoring.monitoring_hrv_status` | `timestamp` / `timestamp` | `weekly_average`, `last_night`, `last_night_average`, `baseline_low/high`, `status`, `reading_count` | 1.4k   | —                              |
 | HRV (valor bruto)    | série                | `garmin_monitoring.monitoring_hrv_value`  | `timestamp` / `timestamp` | `hrv`                                                                                                | 110k   | —                              |
 
 > Body Battery: **só temos o agregado do dia** (carga/máx/mín), não a curva contínua. Se o sistema a jusante quer o gráfico intradiário de BB, o dado não existe.
+
+> ⚠️ **HRV tem duas fontes com cobertura diferente.** `garmin.hrv` é o **HRV Status calculado pela Garmin** (baseline + classificação) e só existe **a partir de 2024-02-16** — a Garmin não computou o Status antes disso para esta conta. As leituras noturnas de HRV **brutas** existem **desde 2022-10-04** (troca de relógio) em `monitoring_hrv_value` / `monitoring_hrv_status.last_night_average`. **Para HRV histórica (2022–2024), leia `monitoring_hrv_*`, não `garmin.hrv`.** Ver `docs/knowledge/2026-07-07-hrv-status-vs-raw-coverage.md`.
 
 ## 4. Respiratório (respiração, SpO₂)
 
