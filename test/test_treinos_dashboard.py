@@ -9,7 +9,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from garmindb.analysis.treinos_dashboard import build_dashboard
+from garmindb.analysis.treinos_dashboard import _hrv_status_pt, build_dashboard
 
 
 TODAY = dt.date(2026, 7, 7)
@@ -184,8 +184,34 @@ def test_carga_performance_uses_official_connect_metrics(tmp_path):
 
     assert any(h["label"] == "Status Garmin" and h["value"] == "Mantendo" for h in carga["hero"])
     assert {"label": "Endurance Score", "current": 7422, "target": None, "unit": ""} in carga["scorecard"]
-    assert {"label": "Aeróbico baixo", "current": 491, "target": 526, "unit": ""} in carga["scorecard"]
     assert any(i["title"] == "Foco de carga Garmin" and "aeróbica baixa" in i["body"] for i in carga["insights"])
+
+    ts = carga["training_status"]
+    assert ts["status"] == {"label": "Mantendo", "level": "good", "note": "oficial Garmin Connect"}
+    assert ts["vo2max"] == {"value": 51.0, "unit": "ml/kg/min"}
+    assert ts["acute_load"] == {
+        "value": 1068, "chronic": 841, "ratio": 1.2,
+        "band_low": 0.8, "band_high": 1.3, "level": "good",
+    }
+    assert ts["hrv"]["value_ms"] == 52
+    assert ts["hrv"]["label_pt"] == "Equilibrado"
+    assert ts["hrv"]["level"] == "good"
+    load_focus = {row["label"]: row for row in ts["load_focus"]}
+    assert load_focus["Aeróbico baixo"] == {
+        "label": "Aeróbico baixo", "current": 491, "target_min": 526, "target_max": 1179,
+    }
+    assert load_focus["Aeróbico alto"] == {
+        "label": "Aeróbico alto", "current": 2032, "target_min": 670, "target_max": 1323,
+    }
+    assert load_focus["Anaeróbico"] == {
+        "label": "Anaeróbico", "current": 755, "target_min": 217, "target_max": 652,
+    }
+
+    scorecard_labels = {row["label"] for row in carga["scorecard"]}
+    assert "VO2max bike" not in scorecard_labels
+    assert "Aeróbico baixo" not in scorecard_labels
+    assert "Aeróbico alto" not in scorecard_labels
+    assert "Anaeróbico" not in scorecard_labels
 
     dump = json.dumps(carga, ensure_ascii=False)
     assert "device-123" not in dump
@@ -217,3 +243,40 @@ def test_build_dashboard_empty_db_gracefully_returns_four_groups(tmp_path):
         assert group["main_chart"] is None
         assert group["charts"] == []
         assert group["insights"] == []
+
+
+def test_training_status_panel_renders_with_hrv_only_data(tmp_path):
+    """HRV-only data (no official status/load/VO2max) should still produce training_status panel."""
+    _mk_dbs(tmp_path)
+
+    # Strip out official Garmin metrics to test HRV-only case
+    garmin = sqlite3.connect(tmp_path / "garmin.db")
+    garmin.execute("DELETE FROM connect_metric_raw")
+    garmin.commit()
+    garmin.close()
+
+    # Strip out VO2max to ensure vo2max_value is None
+    activities = sqlite3.connect(tmp_path / "garmin_activities.db")
+    activities.execute("DELETE FROM cycle_activities")
+    activities.commit()
+    activities.close()
+
+    carga = build_dashboard(db_dir=str(tmp_path), period_end=END)["carga-performance"]
+
+    # training_status should NOT be None even without official Garmin data
+    assert carga["training_status"] is not None
+    # HRV data should be present
+    assert carga["training_status"]["hrv"] is not None
+    assert carga["training_status"]["hrv"]["value_ms"] == 52
+    assert carga["training_status"]["hrv"]["label_pt"] == "Equilibrado"
+    # Official data should be absent
+    assert carga["training_status"]["status"] is None
+    assert carga["training_status"]["vo2max"] is None
+    assert carga["training_status"]["acute_load"] is None
+
+
+def test_hrv_status_fallback_uses_last_night_against_nightly_baseline():
+    # Numeric status triggers fallback; weekly 52 is inside 45–60 but last night 40 is Baixo.
+    assert _hrv_status_pt(3, 40, 45, 60) == ("Baixo", "warning")
+    assert _hrv_status_pt(3, 70, 45, 60) == ("Alto", "warning")
+    assert _hrv_status_pt(3, 52, 45, 60) == ("Equilibrado", "good")

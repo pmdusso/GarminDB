@@ -253,19 +253,88 @@ def _load_focus_pt(phrase):
     return labels.get(str(phrase or "").upper())
 
 
-def _append_load_focus_scorecard(scorecard, load):
+def _acute_load_level(ratio, low=0.8, high=1.3):
+    if ratio is None:
+        return "neutral"
+    return "good" if low <= ratio <= high else "warning"
+
+
+_HRV_STATUS_PT = {
+    "BALANCED": ("Equilibrado", "good"),
+    "UNBALANCED": ("Desequilibrado", "warning"),
+    "LOW": ("Baixo", "warning"),
+    "HIGH": ("Alto", "warning"),
+}
+
+
+def _hrv_status_pt(status, value, baseline_low, baseline_upper):
+    known = _HRV_STATUS_PT.get(str(status or "").upper())
+    if known:
+        return known
+    if value is not None and baseline_low is not None and baseline_upper is not None:
+        if value < baseline_low:
+            return ("Baixo", "warning")
+        if value > baseline_upper:
+            return ("Alto", "warning")
+        return ("Equilibrado", "good")
+    return ("Sem dado", "neutral")
+
+
+def _build_training_status_panel(db_dir, end, official_status, official_load, vo2max_value, status_label, status_level):
+    hrv_rows = daily_hrv_series(db_dir, end - _dt.timedelta(days=BASELINE_DAYS), end)
+    hrv_last = hrv_rows[-1] if hrv_rows else None
+    if not status_label and not official_load and vo2max_value is None and not hrv_last:
+        return None
+    acute = official_status.get("acuteTrainingLoadDTO") or {}
+    acute_value = _number(acute.get("dailyTrainingLoadAcute"))
+    acute_ratio = acute.get("dailyAcuteChronicWorkloadRatio")
+    # ponytail: baseline_low/upper are single-night bands — compare last_night_avg,
+    # not weekly_avg (which almost always sits inside the band and masks bad nights).
+    hrv_label, hrv_level = _hrv_status_pt(
+        hrv_last.get("status") if hrv_last else None,
+        hrv_last.get("last_night_avg") if hrv_last else None,
+        hrv_last.get("baseline_low") if hrv_last else None,
+        hrv_last.get("baseline_upper") if hrv_last else None,
+    )
+
+    load_focus = []
     rows = (
         ("Aeróbico baixo", "monthlyLoadAerobicLow", "monthlyLoadAerobicLowTargetMin", "monthlyLoadAerobicLowTargetMax"),
         ("Aeróbico alto", "monthlyLoadAerobicHigh", "monthlyLoadAerobicHighTargetMin", "monthlyLoadAerobicHighTargetMax"),
         ("Anaeróbico", "monthlyLoadAnaerobic", "monthlyLoadAnaerobicTargetMin", "monthlyLoadAnaerobicTargetMax"),
     )
     for label, value_key, min_key, max_key in rows:
-        current = _number(load.get(value_key))
-        low, high = _number(load.get(min_key)), _number(load.get(max_key))
+        current = _number((official_load or {}).get(value_key))
         if current is None:
             continue
-        target = low if low is not None and current < low else high if high is not None and current > high else None
-        scorecard.append({"label": label, "current": current, "target": target, "unit": ""})
+        load_focus.append({
+            "label": label,
+            "current": current,
+            "target_min": _number((official_load or {}).get(min_key)),
+            "target_max": _number((official_load or {}).get(max_key)),
+        })
+
+    return {
+        "status": {"label": status_label, "level": status_level, "note": "oficial Garmin Connect"} if status_label else None,
+        "vo2max": {"value": vo2max_value, "unit": "ml/kg/min"} if vo2max_value is not None else None,
+        "hrv": {
+            "value_ms": hrv_last.get("weekly_avg") if hrv_last else None,
+            "window": "weekly_avg",
+            "baseline_low": hrv_last.get("baseline_low") if hrv_last else None,
+            "baseline_high": hrv_last.get("baseline_upper") if hrv_last else None,
+            "label_pt": hrv_label,
+            "level": hrv_level,
+        } if hrv_last else None,
+        "acute_load": {
+            "value": acute_value,
+            "chronic": acute_chronic if (acute_chronic := _number(acute.get("dailyTrainingLoadChronic"))) is not None else None,
+            "ratio": acute_ratio,
+            "band_low": 0.8,
+            "band_high": 1.3,
+            "level": _acute_load_level(acute_ratio),
+        } if acute_value is not None else None,
+        "load_focus": load_focus,
+    }
 
 
 def _build_cardiovascular(db_dir, cfg, start, end):
@@ -416,8 +485,6 @@ def _build_carga_performance(db_dir, cfg, start, end):
         scorecard.append({"label": "FTP", "current": ftp, "target": cfg["ftp_target"], "unit": "W"})
     if wkg and cfg.get("wkg_target"):
         scorecard.append({"label": "W/kg", "current": wkg, "target": cfg["wkg_target"], "unit": ""})
-    if _first(vo2, "vo2_max"):
-        scorecard.append({"label": "VO2max bike", "current": _first(vo2, "vo2_max"), "target": None, "unit": ""})
     power_rows = power_summary_rows(db_dir, start, end)
     best_20 = [r["best_1200s"] for r in power_rows if r.get("best_1200s")]
     if best_20:
@@ -425,9 +492,12 @@ def _build_carga_performance(db_dir, cfg, start, end):
     official_status, official_load = _official_training_metrics(db_dir, end)
     endurance_score = _number(_official_endurance_score(db_dir, end))
     status_label = _training_status_pt(official_status.get("trainingStatusFeedbackPhrase"))
+    status_level = _training_status_level(official_status.get("trainingStatusFeedbackPhrase"))
     if endurance_score is not None:
         scorecard.append({"label": "Endurance Score", "current": endurance_score, "target": None, "unit": ""})
-    _append_load_focus_scorecard(scorecard, official_load)
+    training_status = _build_training_status_panel(
+        db_dir, end, official_status, official_load, _first(vo2, "vo2_max"), status_label, status_level,
+    )
     zones = [{"zone": z, "label": f"Z{z}", "min_w": round(ftp * lo), "max_w": round(ftp * hi) if hi else None} for z, lo, hi in FTP_ZONES] if ftp else []
     charts = [_chart("bars", "Volume semanal", xh,
                      [{"label": "Horas", "values": [round(v, 1) for v in hours], "style": "bars"},
@@ -464,6 +534,7 @@ def _build_carga_performance(db_dir, cfg, start, end):
                               {"label": "Carga crônica (EPOC 42d)", "values": [round(v, 1) for v in chronic]}]),
         "charts": charts,
         "insights": insights, "zones": zones, "scorecard": scorecard,
+        "training_status": training_status,
     }
 
 
