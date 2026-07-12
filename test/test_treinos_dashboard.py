@@ -9,7 +9,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from garmindb.analysis.treinos_dashboard import build_dashboard
+from garmindb.analysis.treinos_dashboard import _hrv_status_pt, build_dashboard
 
 
 TODAY = dt.date(2026, 7, 7)
@@ -273,3 +273,10 @@ def test_training_status_panel_renders_with_hrv_only_data(tmp_path):
     assert carga["training_status"]["status"] is None
     assert carga["training_status"]["vo2max"] is None
     assert carga["training_status"]["acute_load"] is None
+
+
+def test_hrv_status_fallback_uses_last_night_against_nightly_baseline():
+    # Numeric status triggers fallback; weekly 52 is inside 45–60 but last night 40 is Baixo.
+    assert _hrv_status_pt(3, 40, 45, 60) == ("Baixo", "warning")
+    assert _hrv_status_pt(3, 70, 45, 60) == ("Alto", "warning")
+    assert _hrv_status_pt(3, 52, 45, 60) == ("Equilibrado", "good")

@@ -288,9 +288,11 @@ def _build_training_status_panel(db_dir, end, official_status, official_load, vo
     acute = official_status.get("acuteTrainingLoadDTO") or {}
     acute_value = _number(acute.get("dailyTrainingLoadAcute"))
     acute_ratio = acute.get("dailyAcuteChronicWorkloadRatio")
+    # ponytail: baseline_low/upper are single-night bands — compare last_night_avg,
+    # not weekly_avg (which almost always sits inside the band and masks bad nights).
     hrv_label, hrv_level = _hrv_status_pt(
         hrv_last.get("status") if hrv_last else None,
-        hrv_last.get("weekly_avg") if hrv_last else None,
+        hrv_last.get("last_night_avg") if hrv_last else None,
         hrv_last.get("baseline_low") if hrv_last else None,
         hrv_last.get("baseline_upper") if hrv_last else None,
     )
